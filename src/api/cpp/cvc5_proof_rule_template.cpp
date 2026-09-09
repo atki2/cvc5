@@ -122,6 +122,7 @@ const char* toString(ProofRule rule)
     case ProofRule::BV_POLY_NORM_EQ: return "BV_POLY_NORM_EQ";
     case ProofRule::BV_INTBLAST_STEP: return "BV_INTBLAST_STEP";
     case ProofRule::BV_INTBLAST_RANGE: return "BV_INTBLAST_RANGE";
+    case ProofRule::BV_INTBLAST_RANGE_QUANT: return "BV_INTBLAST_RANGE_QUANT";
     case ProofRule::BV_INTBLAST_BITWISE: return "BV_INTBLAST_BITWISE";
     //================================================= Datatype rules
     case ProofRule::DT_SPLIT: return "DT_SPLIT";

@@ -140,9 +140,11 @@ class IntBlaster : protected EnvObj, public ProofGenerator
    * Get proof for fact, where fact may correspond to:
    * (1) An equality of the form (= n n') where n was rewritten to n' in the
    * method trustedIntBlast, proven by ProofRule::BV_INTBLAST_STEP.
-   * (2) A range constraint added in addRangeConstraint or
-   * addQuantifiedRangeConstraint, proven by ProofRule::BV_INTBLAST_RANGE.
-   * (3) A bitwise constraint added in addBitwiseConstraint, proven by
+   * (2) A range constraint added in addRangeConstraint, proven by
+   * ProofRule::BV_INTBLAST_RANGE.
+   * (3) A quantified range constraint added in addQuantifiedRangeConstraint,
+   * proven by ProofRule::BV_INTBLAST_RANGE_QUANT.
+   * (4) A bitwise constraint added in addBitwiseConstraint, proven by
    * ProofRule::BV_INTBLAST_BITWISE.
    */
   std::shared_ptr<ProofNode> getProofFor(Node fact) override;

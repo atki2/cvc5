@@ -122,7 +122,7 @@ void IntBlaster::addQuantifiedRangeConstraint(Node f,
                                   "range constraint added to cache and lemmas "
                                << std::endl;
     d_rangeNodes.insert(f);
-    d_factProofRule.insert(rangeConstraint, ProofRule::BV_INTBLAST_RANGE);
+    d_factProofRule.insert(rangeConstraint, ProofRule::BV_INTBLAST_RANGE_QUANT);
     TrustNode trn = TrustNode::mkTrustLemma(rangeConstraint, this);
     lemmas.push_back(trn);
   }
