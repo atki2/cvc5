@@ -1423,6 +1423,65 @@ enum ENUM(ProofRule)
   EVALUE(BV_POLY_NORM_EQ),
   /**
    * \verbatim embed:rst:leading-asterisk
+   * **Bit-vectors -- Int-blasting translation step**
+   *
+   * .. math::
+   *
+   *   \inferrule{-\mid F}{F}
+   *
+   * where :math:`F` is an equivalence between a predicate over bit-vectors and
+   * its integer translation, computed by the int-blasting preprocessing pass.
+   * \endverbatim
+   */
+  EVALUE(BV_INTBLAST_STEP),
+  /**
+   * \verbatim embed:rst:leading-asterisk
+   * **Bit-vectors -- Int-blasting range constraint**
+   *
+   * .. math::
+   *
+   *   \inferrule{-\mid F}{F}
+   *
+   * where :math:`F` is the constraint :math:`0 \leq k < 2^n` on the integer
+   * variable :math:`k` that the int-blasting preprocessing pass introduced for
+   * a bit-vector variable of width :math:`n`.
+   * \endverbatim
+   */
+  EVALUE(BV_INTBLAST_RANGE),
+  /**
+   * \verbatim embed:rst:leading-asterisk
+   * **Bit-vectors -- Int-blasting quantified range constraint**
+   *
+   * .. math::
+   *
+   *   \inferrule{-\mid F}{F}
+   *
+   * where :math:`F` is a universally quantified range constraint
+   * :math:`\forall x_1 \dots x_m.\; 0 \leq f(x_1,\dots,x_m) < 2^n` on the
+   * integer function :math:`f` that the int-blasting preprocessing pass
+   * introduced for an uninterpreted function whose range is a bit-vector sort
+   * of width :math:`n`. This rule is a placeholder that does not yet check the
+   * correctness of :math:`F`, since the bit-width :math:`n` is not recoverable
+   * from the printed form of :math:`f`.
+   * \endverbatim
+   */
+  EVALUE(BV_INTBLAST_RANGE_QUANT),
+  /**
+   * \verbatim embed:rst:leading-asterisk
+   * **Bit-vectors -- Int-blasting bitwise constraint**
+   *
+   * .. math::
+   *
+   *   \inferrule{-\mid F}{F}
+   *
+   * where :math:`F` is a bitwise constraint introduced by the int-blasting
+   * preprocessing pass when translating bit-wise operators. This rule is a
+   * placeholder that does not yet check the correctness of :math:`F`.
+   * \endverbatim
+   */
+  EVALUE(BV_INTBLAST_BITWISE),
+  /**
+   * \verbatim embed:rst:leading-asterisk
    * **Datatypes -- Split**
    *
    * .. math::
