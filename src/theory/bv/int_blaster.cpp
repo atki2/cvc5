@@ -72,7 +72,23 @@ std::shared_ptr<ProofNode> IntBlaster::getProofFor(Node fact)
   CDProof cdp(d_env);
   CDNodeRuleMap::const_iterator it = d_factProofRule.find(fact);
   Assert(it != d_factProofRule.end());
-  cdp.addStep(fact, (*it).second, {}, {fact});
+  std::vector<Node> args{fact};
+  if ((*it).second == ProofRule::BV_INTBLAST_STEP)
+  {
+    // the translation of bitwise operators depends on the mode and granularity
+    uint32_t mode = 0;
+    switch (d_mode)
+    {
+      case options::SolveBVAsIntMode::SUM: mode = 1; break;
+      case options::SolveBVAsIntMode::IAND: mode = 2; break;
+      case options::SolveBVAsIntMode::BV: mode = 3; break;
+      case options::SolveBVAsIntMode::BITWISE: mode = 4; break;
+      default: Unreachable();
+    }
+    args.push_back(d_nm->mkConstInt(Rational(mode)));
+    args.push_back(d_nm->mkConstInt(Rational(d_granularity)));
+  }
+  cdp.addStep(fact, (*it).second, {}, args);
   return cdp.getProofFor(fact);
 }
 
@@ -973,14 +989,11 @@ Node IntBlaster::castToType(Node n, TypeNode tn)
   // casting integers to bit-vectors
   if (n.getType().isInteger())
   {
-    Assert(tn.isBitVector());
     unsigned bvsize = tn.getBitVectorSize();
     Node intToBVOp = d_nm->mkConst<IntToBitVector>(IntToBitVector(bvsize));
     return d_nm->mkNode(intToBVOp, n);
   }
   // casting bit-vectors to ingers
-  Assert(n.getType().isBitVector());
-  Assert(tn.isInteger());
   return d_nm->mkNode(Kind::BITVECTOR_UBV_TO_INT, n);
 }
 

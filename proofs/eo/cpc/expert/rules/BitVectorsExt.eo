@@ -1,0 +1,28 @@
+(include "../theories/ArithExt.eo")
+(include "../../programs/IntBlasting.eo")
+
+; program: $bv_intblast_iand
+; args:
+; - x Int: The first argument.
+; - y Int: The second argument.
+; - sz Int: The bit-width of x and y.
+; - md Int: The value of --solve-bv-as-int, which is iand or bitwise.
+; return: the int-blasted term for the bitwise and of x and y.
+(program $bv_intblast_iand ((x Int) (y Int) (sz Int))
+  :signature (Int Int Int Int) Int
+  (
+  (($bv_intblast_iand x y sz 2) (iand sz x y))
+  (($bv_intblast_iand x y sz 4) (@purify (iand sz x y)))
+  )
+)
+
+; program: $bv_intblast_range_bound_iand
+; args:
+; - t Int: The term purified by the integer variable of a range constraint.
+; return: two raised to the bit-width of the values of t, if t is an application of iand.
+(program $bv_intblast_range_bound_iand ((sz Int) (x Int) (y Int))
+  :signature (Int) Int
+  (
+  (($bv_intblast_range_bound_iand (iand sz x y)) ($arith_eval_int_pow_2 sz))
+  )
+)

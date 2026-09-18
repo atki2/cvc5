@@ -1427,10 +1427,14 @@ enum ENUM(ProofRule)
    *
    * .. math::
    *
-   *   \inferrule{-\mid F}{F}
+   *   \inferrule{-\mid F, m, g}{F}
    *
    * where :math:`F` is an equivalence between a predicate over bit-vectors and
    * its integer translation, computed by the int-blasting preprocessing pass.
+   * :math:`m` and :math:`g` are the values of the options
+   * ``--solve-bv-as-int`` (sum = 1, iand = 2, bv = 3, bitwise = 4) and
+   * ``--bvand-integer-granularity``, which determine the translation of
+   * bitwise operators.
    * \endverbatim
    */
   EVALUE(BV_INTBLAST_STEP),
@@ -1442,9 +1446,10 @@ enum ENUM(ProofRule)
    *
    *   \inferrule{-\mid F}{F}
    *
-   * where :math:`F` is the constraint :math:`0 \leq k < 2^n` on the integer
-   * variable :math:`k` that the int-blasting preprocessing pass introduced for
-   * a bit-vector variable of width :math:`n`.
+   * where :math:`F` is the constraint :math:`0 \leq k < 2^n` on an integer
+   * variable :math:`k` introduced by the int-blasting preprocessing pass, which
+   * is either the purification of a bit-vector variable of width :math:`n`, or
+   * the purification of an integer-and of width :math:`n`.
    * \endverbatim
    */
   EVALUE(BV_INTBLAST_RANGE),

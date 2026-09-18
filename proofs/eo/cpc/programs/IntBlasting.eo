@@ -1,0 +1,401 @@
+(include "../programs/Arith.eo")
+(include "../programs/BitVectors.eo")
+(include "../programs/Nary.eo")
+(include "../theories/ArithBvConv.eo")
+(include "../theories/Ints.eo")
+
+; note: >
+;   The programs below that take md and gr, the values of --solve-bv-as-int
+;   (sum=1, iand=2, bv=3, bitwise=4) and --bvand-integer-granularity, pass them
+;   on to $bv_intblast_and.
+
+; forward declarations, since the programs below are mutually recursive
+(program $bv_mk_intblast_step_term ((n Int) (a (BitVec n)) (md Int) (gr Int))
+  :signature ((BitVec n) Int Int) Int)
+(program $bv_mk_intblast_step ((f Bool) (md Int) (gr Int))
+  :signature (Bool Int Int) Bool)
+
+;;; equality
+
+; define: $bv_mk_intblast_step_eq
+; args:
+; - a1 (BitVec n): The left hand side of the equality.
+; - a2 (BitVec n): The right hand side of the equality.
+; return: the int-blasted term for (= a1 a2).
+(define $bv_mk_intblast_step_eq ((n Int :implicit) (a1 (BitVec n)) (a2 (BitVec n)) (md Int) (gr Int))
+  (= ($bv_mk_intblast_step_term a1 md gr) ($bv_mk_intblast_step_term a2 md gr)))
+
+;;; inequality
+
+; define: $bv_intblast_ult
+; args:
+; - x (BitVec n): The left hand side of the unsigned inequality predicate.
+; - y (BitVec n): The right hand side of the unsigned inequality predicate.
+; return: the int-blasted term for (bvult x y).
+(define $bv_intblast_ult ((n Int :implicit) (x (BitVec n)) (y (BitVec n)) (md Int) (gr Int))
+  (< ($bv_mk_intblast_step_term x md gr) ($bv_mk_intblast_step_term y md gr)))
+
+; define: $bv_intblast_uts
+; args:
+; - x (BitVec n): The bitvector term to interpret as a signed integer.
+; return: the int-blasted term for x, interpreted as a signed integer.
+(define $bv_intblast_uts ((n Int :implicit) (x (BitVec n)) (md Int) (gr Int))
+  (eo::define ((i ($bv_mk_intblast_step_term x md gr)))
+  (eo::define ((w ($bv_bitwidth (eo::typeof x))))
+    (- i (ite (< i ($arith_eval_int_pow_2 (eo::add w -1))) 0 ($arith_eval_int_pow_2 w))))))
+
+; define: $bv_intblast_slt
+; args:
+; - x (BitVec n): The left hand side of the signed inequality predicate.
+; - y (BitVec n): The right hand side of the signed inequality predicate.
+; return: the int-blasted term for (bvslt x y).
+(define $bv_intblast_slt ((n Int :implicit) (x (BitVec n)) (y (BitVec n)) (md Int) (gr Int))
+  (< ($bv_intblast_uts x md gr) ($bv_intblast_uts y md gr)))
+
+;;; extract
+
+; define: $bv_mk_intblast_step_extract
+; args:
+; - u Int: The upper index of the extract.
+; - l Int: The lower index of the extract.
+; - a (BitVec n): The argument of the extract.
+; return: the int-blasted term for (extract u l a).
+(define $bv_mk_intblast_step_extract ((n Int :implicit) (u Int) (l Int) (a (BitVec n)) (md Int) (gr Int))
+  (mod_total (div_total ($bv_mk_intblast_step_term a md gr) ($arith_eval_int_pow_2 l))
+             ($arith_eval_int_pow_2 (eo::add u (eo::neg l) 1))))
+
+;;; concat
+
+; program: $bv_mk_intblast_step_concat
+; args:
+; - ac Int: The accumulated return value.
+; - a (BitVec n): A concatenation term over arguments left to process.
+; return: the int-blasted term for a, given already processed arguments ac.
+(program $bv_mk_intblast_step_concat ((ac Int) (n Int) (a1 (BitVec n)) (m Int) (a2 (BitVec m) :list) (md Int) (gr Int))
+  :signature (Int (BitVec n) Int Int) Int
+  (
+  (($bv_mk_intblast_step_concat ac @bv_empty md gr)      ac)
+  (($bv_mk_intblast_step_concat ac (concat a1 a2) md gr) ($bv_mk_intblast_step_concat
+                                                           (+ (* ac ($arith_eval_int_pow_2 ($bv_bitwidth (eo::typeof a1))))
+                                                              ($bv_mk_intblast_step_term a1 md gr))
+                                                           a2 md gr))
+  )
+)
+
+;;; bitwise
+
+; program: $bv_intblast_and_row
+; args:
+; - x Int: The first argument.
+; - y Int: The second argument.
+; - gs Int: The bit-width of x and y.
+; - i Int: The value of x in this row.
+; - js (@TList Int): The values of y left to process.
+; - ac Int: The accumulated return value.
+; return: the if-then-else chain for row i of the table of the bitwise and, given ac.
+(program $bv_intblast_and_row ((x Int) (y Int) (gs Int) (i Int) (j Int) (js (@TList Int) :list) (ac Int))
+  :signature (Int Int Int Int (@TList Int) Int) Int
+  (
+  (($bv_intblast_and_row x y gs i (@tlist.nil Int) ac) ac)
+  (($bv_intblast_and_row x y gs i (@tlist j js) ac)
+    (eo::define ((v (eo::to_z (eo::and (eo::to_bin gs i) (eo::to_bin gs j)))))
+      ($bv_intblast_and_row x y gs i js (eo::ite (eo::eq v 0) ac (ite (and (= x i) (= y j)) v ac)))))
+  )
+)
+
+; program: $bv_intblast_and_table
+; args:
+; - x Int: The first argument.
+; - y Int: The second argument.
+; - gs Int: The bit-width of x and y.
+; - is (@TList Int): The values of x left to process.
+; - ac Int: The accumulated return value.
+; return: >
+;   the if-then-else chain for the table of the bitwise and, given ac. Entries
+;   whose value is zero, the most common value, are omitted.
+(program $bv_intblast_and_table ((x Int) (y Int) (gs Int) (i Int) (is (@TList Int) :list) (ac Int))
+  :signature (Int Int Int (@TList Int) Int) Int
+  (
+  (($bv_intblast_and_table x y gs (@tlist.nil Int) ac) ac)
+  (($bv_intblast_and_table x y gs (@tlist i is) ac)
+    ($bv_intblast_and_table x y gs is ($bv_intblast_and_row x y gs i ($iota ($arith_eval_int_pow_2 gs)) ac)))
+  )
+)
+
+; program: $bv_intblast_and_sum
+; args:
+; - x Int: The first argument.
+; - y Int: The second argument.
+; - gs Int: The granularity, a divisor of the bit-width of x and y.
+; - is (@TList Int): The indices of the blocks left to process.
+; - ac Int: The accumulated return value.
+; return: the sum for the bitwise and of x and y, given already processed blocks ac.
+(program $bv_intblast_and_sum ((x Int) (y Int) (gs Int) (i Int) (is (@TList Int) :list) (ac Int))
+  :signature (Int Int Int (@TList Int) Int) Int
+  (
+  (($bv_intblast_and_sum x y gs (@tlist.nil Int) ac) ac)
+  (($bv_intblast_and_sum x y gs (@tlist i is) ac)
+    (eo::define ((p ($arith_eval_int_pow_2 (eo::mul i gs))))
+    (eo::define ((q ($arith_eval_int_pow_2 gs)))
+      ($bv_intblast_and_sum x y gs is
+        (+ ac (* p ($bv_intblast_and_table (mod_total (div_total x p) q) (mod_total (div_total y p) q) gs ($iota q) 0)))))))
+  )
+)
+
+; program: $bv_intblast_granularity
+; args:
+; - sz Int: The bit-width.
+; - g Int: The granularity.
+; return: sz if g is greater than sz, and the greatest divisor of sz not greater than g otherwise.
+(program $bv_intblast_granularity ((sz Int) (g Int))
+  :signature (Int Int) Int
+  (
+  (($bv_intblast_granularity sz g) (eo::ite (eo::gt g sz) sz
+                                     (eo::ite (eo::eq (eo::zmod sz g) 0) g ($bv_intblast_granularity sz (eo::add g -1)))))
+  )
+)
+
+; the translations of the modes iand and bitwise use the iand operator, and hence
+; are defined in the expert signature.
+(program $bv_intblast_iand ((x Int) (y Int) (sz Int) (md Int))
+  :signature (Int Int Int Int) Int)
+
+; program: $bv_intblast_and
+; args:
+; - x Int: The first argument.
+; - y Int: The second argument.
+; - sz Int: The bit-width of x and y.
+; - md Int: The value of --solve-bv-as-int.
+; - gr Int: The value of --bvand-integer-granularity.
+; return: the int-blasted term for the bitwise and of x and y.
+(program $bv_intblast_and ((x Int) (y Int) (sz Int) (gr Int))
+  :signature (Int Int Int Int Int) Int
+  (
+  (($bv_intblast_and x y sz 1 gr) (eo::define ((gs ($bv_intblast_granularity sz gr)))
+                                    ($bv_intblast_and_sum x y gs ($iota (eo::zdiv sz gs)) 0)))
+  (($bv_intblast_and x y sz 2 gr) ($bv_intblast_iand x y sz 2))
+  (($bv_intblast_and x y sz 3 gr) (ubv_to_int (bvand (int_to_bv sz x) (int_to_bv sz y))))
+  (($bv_intblast_and x y sz 4 gr) ($bv_intblast_iand x y sz 4))
+  )
+)
+
+; program: $bv_intblast_apply_binary
+; args:
+; - bf (-> (BitVec n) (BitVec n) (BitVec n)): The bitvector function.
+; - x Int: The first argument.
+; - y Int: The second argument.
+; - sz Int: The bit-width of x and y.
+; return: the int-blasted term for the application of bf to x and y.
+(program $bv_intblast_apply_binary ((n Int) (x Int) (y Int) (sz Int) (md Int) (gr Int))
+  :signature ((-> (BitVec n) (BitVec n) (BitVec n)) Int Int Int Int Int) Int
+  (
+  (($bv_intblast_apply_binary bvor x y sz md gr)  (eo::define ((w ($arith_eval_int_pow_2 sz)))
+                                                    (mod_total (- (mod_total (+ x y) w) ($bv_intblast_and x y sz md gr)) w)))
+  (($bv_intblast_apply_binary bvxor x y sz md gr) (mod_total (- ($bv_intblast_apply_binary bvor x y sz md gr) ($bv_intblast_and x y sz md gr))
+                                                             ($arith_eval_int_pow_2 sz)))
+  (($bv_intblast_apply_binary bvand x y sz md gr) ($bv_intblast_and x y sz md gr))
+  )
+)
+
+; program: $bv_mk_intblast_step_bitwise
+; args:
+; - bf (-> (BitVec n) (BitVec n) (BitVec n)): The bitvector function.
+; - a (BitVec m): The term we are int-blasting, expected to be an application of bf.
+; - ac Int: The accumulated return value.
+; return: the int-blasted version of a.
+(program $bv_mk_intblast_step_bitwise ((n Int) (m Int) (bf (-> (BitVec n) (BitVec n) (BitVec n)))
+                                       (a1 (BitVec m)) (a2 (BitVec m) :list) (ac Int) (md Int) (gr Int))
+  :signature ((-> (BitVec n) (BitVec n) (BitVec n)) (BitVec m) Int Int Int) Int
+  (
+  (($bv_mk_intblast_step_bitwise bf (bf a1 a2) ac md gr) ($bv_mk_intblast_step_bitwise bf a2
+                                                           ($bv_intblast_apply_binary bf ac ($bv_mk_intblast_step_term a1 md gr)
+                                                                                      ($bv_bitwidth (eo::typeof a1)) md gr)
+                                                           md gr))
+  (($bv_mk_intblast_step_bitwise bf a2 ac md gr)         (eo::requires a2 (eo::nil bf (eo::typeof a2)) ac))
+  )
+)
+
+;;; addition
+
+; program: $bv_mk_intblast_step_add
+; args:
+; - a (BitVec n): An addition term over arguments left to process.
+; - ac Int: The accumulated return value.
+; return: the int-blasted term for a, given already processed arguments ac.
+(program $bv_mk_intblast_step_add ((n Int) (a1 (BitVec n)) (a2 (BitVec n) :list) (ac Int) (md Int) (gr Int))
+  :signature ((BitVec n) Int Int Int) Int
+  (
+  (($bv_mk_intblast_step_add (bvadd a1 a2) ac md gr) ($bv_mk_intblast_step_add a2
+                                                       (mod_total (+ ac ($bv_mk_intblast_step_term a1 md gr))
+                                                                  ($arith_eval_int_pow_2 ($bv_bitwidth (eo::typeof a1))))
+                                                       md gr))
+  (($bv_mk_intblast_step_add a2 ac md gr)            (eo::requires (eo::to_z a2) 0 ac))
+  )
+)
+
+;;; multiplication
+
+; program: $bv_mk_intblast_step_mul
+; args:
+; - a (BitVec n): A multiplication term over arguments left to process.
+; - ac Int: The accumulated return value.
+; return: the int-blasted term for a, given already processed arguments ac.
+(program $bv_mk_intblast_step_mul ((n Int) (a1 (BitVec n)) (a2 (BitVec n) :list) (ac Int) (md Int) (gr Int))
+  :signature ((BitVec n) Int Int Int) Int
+  (
+  (($bv_mk_intblast_step_mul (bvmul a1 a2) ac md gr) ($bv_mk_intblast_step_mul a2
+                                                       (mod_total (* ac ($bv_mk_intblast_step_term a1 md gr))
+                                                                  ($arith_eval_int_pow_2 ($bv_bitwidth (eo::typeof a1))))
+                                                       md gr))
+  (($bv_mk_intblast_step_mul a2 ac md gr)            (eo::requires (eo::to_z a2) 1 ac))
+  )
+)
+
+;;; division and remainder
+
+; define: $bv_mk_intblast_step_udiv
+; args:
+; - a1 (BitVec n): The first argument.
+; - a2 (BitVec n): The second argument.
+; return: the int-blasted term for (bvudiv a1 a2).
+(define $bv_mk_intblast_step_udiv ((n Int :implicit) (a1 (BitVec n)) (a2 (BitVec n)) (md Int) (gr Int))
+  (eo::define ((sz ($bv_bitwidth (eo::typeof a1))))
+  (eo::define ((y ($bv_mk_intblast_step_term a2 md gr)))
+    (ite (= y 0) (- ($arith_eval_int_pow_2 sz) 1) (div_total ($bv_mk_intblast_step_term a1 md gr) y)))))
+
+; define: $bv_mk_intblast_step_urem
+; args:
+; - a1 (BitVec n): The first argument.
+; - a2 (BitVec n): The second argument.
+; return: the int-blasted term for (bvurem a1 a2).
+(define $bv_mk_intblast_step_urem ((n Int :implicit) (a1 (BitVec n)) (a2 (BitVec n)) (md Int) (gr Int))
+  (eo::define ((x ($bv_mk_intblast_step_term a1 md gr)))
+  (eo::define ((y ($bv_mk_intblast_step_term a2 md gr)))
+    (ite (= y 0) x (mod_total x y)))))
+
+;;; negation
+
+; define: $bv_mk_intblast_step_bvnot
+; args:
+; - a (BitVec n): The argument.
+; return: the int-blasted term for (bvnot a).
+(define $bv_mk_intblast_step_bvnot ((n Int :implicit) (a (BitVec n)) (md Int) (gr Int))
+  (- (eo::add ($arith_eval_int_pow_2 ($bv_bitwidth (eo::typeof a))) -1) ($bv_mk_intblast_step_term a md gr)))
+
+; define: $bv_mk_intblast_step_bvneg
+; args:
+; - a (BitVec n): The argument.
+; return: the int-blasted term for (bvneg a).
+(define $bv_mk_intblast_step_bvneg ((n Int :implicit) (a (BitVec n)) (md Int) (gr Int))
+  (mod_total (+ ($bv_mk_intblast_step_bvnot a md gr) 1) ($arith_eval_int_pow_2 ($bv_bitwidth (eo::typeof a)))))
+
+;;; ite
+
+; define: $bv_mk_intblast_step_ite
+; args:
+; - c Bool: The condition.
+; - x (BitVec n): The then branch.
+; - y (BitVec n): The else branch.
+; return: the int-blasted term for (ite c x y).
+(define $bv_mk_intblast_step_ite ((n Int :implicit) (c Bool) (x (BitVec n)) (y (BitVec n)) (md Int) (gr Int))
+  (ite ($bv_mk_intblast_step c md gr) ($bv_mk_intblast_step_term x md gr) ($bv_mk_intblast_step_term y md gr)))
+
+;;; Boolean connectives
+
+; define: $bv_mk_intblast_step_not
+; args:
+; - f Bool: The argument.
+; return: the int-blasted term for (not f).
+(define $bv_mk_intblast_step_not ((f Bool) (md Int) (gr Int))
+  (not ($bv_mk_intblast_step f md gr)))
+
+; define: $bv_mk_intblast_step_ite_bool
+; args:
+; - f Bool: The condition.
+; - g Bool: The then branch.
+; - h Bool: The else branch.
+; return: the int-blasted term for (ite f g h).
+(define $bv_mk_intblast_step_ite_bool ((f Bool) (g Bool) (h Bool) (md Int) (gr Int))
+  (ite ($bv_mk_intblast_step f md gr) ($bv_mk_intblast_step g md gr) ($bv_mk_intblast_step h md gr)))
+
+;;; constants
+
+; define: $bv_mk_intblast_step_const
+; args:
+; - a (BitVec n): The bitvector constant to int-blast.
+; return: the int-blasted term for a, which is its unsigned value.
+(define $bv_mk_intblast_step_const ((n Int :implicit) (a (BitVec n)))
+  (eo::to_z a))
+
+;;; variables
+
+; define: $bv_mk_intblast_step_var
+; args:
+; - a (BitVec n): The bitvector variable to int-blast.
+; return: the int-blasted term for variable a.
+(define $bv_mk_intblast_step_var ((n Int :implicit) (a (BitVec n)))
+  (@purify (ubv_to_int a)))
+
+;;; range
+
+; the range of the iand operator is defined in the expert signature.
+(program $bv_intblast_range_bound_iand ((t Int))
+  :signature (Int) Int)
+
+; program: $bv_intblast_range_bound
+; args:
+; - t Int: The term purified by the integer variable of a range constraint.
+; return: two raised to the bit-width of the values of t.
+(program $bv_intblast_range_bound ((n Int) (x (BitVec n)) (t Int))
+  :signature (Int) Int
+  (
+  (($bv_intblast_range_bound (ubv_to_int x)) ($arith_eval_int_pow_2 ($bv_bitwidth (eo::typeof x))))
+  (($bv_intblast_range_bound t)              ($bv_intblast_range_bound_iand t))
+  )
+)
+
+;;; $bv_mk_intblast_step_term
+
+; program: $bv_mk_intblast_step_term
+; args:
+; - a (BitVec n): The bitvector term to int-blast.
+; return: the int-blasted term for a.
+(program $bv_mk_intblast_step_term ((n Int) (a1 (BitVec n)) (a2 (BitVec n) :list) (u Int) (l Int) (m Int) (a3 (BitVec m) :list)
+                                    (c Bool) (a4 (BitVec n)) (md Int) (gr Int))
+  :signature ((BitVec n) Int Int) Int
+  (
+  (($bv_mk_intblast_step_term (bvnot a1) md gr)       ($bv_mk_intblast_step_bvnot a1 md gr))
+  (($bv_mk_intblast_step_term (extract u l a1) md gr) ($bv_mk_intblast_step_extract u l a1 md gr))
+  (($bv_mk_intblast_step_term (concat a1 a3) md gr)   ($bv_mk_intblast_step_concat ($bv_mk_intblast_step_term a1 md gr) a3 md gr))
+  (($bv_mk_intblast_step_term (bvor a1 a2) md gr)     ($bv_mk_intblast_step_bitwise bvor a2 ($bv_mk_intblast_step_term a1 md gr) md gr))
+  (($bv_mk_intblast_step_term (bvxor a1 a2) md gr)    ($bv_mk_intblast_step_bitwise bvxor a2 ($bv_mk_intblast_step_term a1 md gr) md gr))
+  (($bv_mk_intblast_step_term (bvand a1 a2) md gr)    ($bv_mk_intblast_step_bitwise bvand a2 ($bv_mk_intblast_step_term a1 md gr) md gr))
+  (($bv_mk_intblast_step_term (bvadd a1 a2) md gr)    ($bv_mk_intblast_step_add a2 ($bv_mk_intblast_step_term a1 md gr) md gr))
+  (($bv_mk_intblast_step_term (bvmul a1 a2) md gr)    ($bv_mk_intblast_step_mul a2 ($bv_mk_intblast_step_term a1 md gr) md gr))
+  (($bv_mk_intblast_step_term (bvudiv a1 a2) md gr)   ($bv_mk_intblast_step_udiv a1 a2 md gr))
+  (($bv_mk_intblast_step_term (bvurem a1 a2) md gr)   ($bv_mk_intblast_step_urem a1 a2 md gr))
+  (($bv_mk_intblast_step_term (bvneg a1) md gr)       ($bv_mk_intblast_step_bvneg a1 md gr))
+  (($bv_mk_intblast_step_term (ite c a1 a4) md gr)    ($bv_mk_intblast_step_ite c a1 a4 md gr))
+  (($bv_mk_intblast_step_term a1 md gr)               (eo::ite (eo::is_bin a1)
+                                                        ($bv_mk_intblast_step_const a1)
+                                                        ($bv_mk_intblast_step_var a1)))    ; otherwise assume a variable
+  )
+)
+
+;;; $bv_mk_intblast_step
+
+; program: $bv_mk_intblast_step
+; args:
+; - a Bool: The predicate to int-blast.
+; return: the int-blasted term for a.
+(program $bv_mk_intblast_step ((n Int) (a1 (BitVec n)) (a2 (BitVec n)) (f Bool) (g Bool) (h Bool) (md Int) (gr Int))
+  :signature (Bool Int Int) Bool
+  (
+  (($bv_mk_intblast_step (= a1 a2) md gr)      ($bv_mk_intblast_step_eq a1 a2 md gr))
+  (($bv_mk_intblast_step (bvult a1 a2) md gr)  ($bv_intblast_ult a1 a2 md gr))
+  (($bv_mk_intblast_step (bvslt a1 a2) md gr)  ($bv_intblast_slt a1 a2 md gr)) ; Check if redundent
+  (($bv_mk_intblast_step (not f) md gr)        ($bv_mk_intblast_step_not f md gr))
+  (($bv_mk_intblast_step (ite f g h) md gr)    ($bv_mk_intblast_step_ite_bool f g h md gr))
+  (($bv_mk_intblast_step f md gr)              f)    ; otherwise assume a Boolean atom
+  )
+)

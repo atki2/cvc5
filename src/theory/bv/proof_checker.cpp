@@ -133,7 +133,13 @@ Node BVProofRuleChecker::checkInternal(ProofRule id,
     }
     return ret;
   }
-  else if (id == ProofRule::BV_INTBLAST_STEP || id == ProofRule::BV_INTBLAST_RANGE
+  else if (id == ProofRule::BV_INTBLAST_STEP)
+  {
+    Assert(children.empty());
+    Assert(args.size() == 3);
+    return args[0];
+  }
+  else if (id == ProofRule::BV_INTBLAST_RANGE
            || id == ProofRule::BV_INTBLAST_RANGE_QUANT
            || id == ProofRule::BV_INTBLAST_BITWISE)
   {
