@@ -33,7 +33,6 @@ void BVProofRuleChecker::registerTo(ProofChecker* pc)
   pc->registerChecker(ProofRule::BV_INTBLAST_STEP, this);
   pc->registerChecker(ProofRule::BV_INTBLAST_RANGE, this);
   pc->registerChecker(ProofRule::BV_INTBLAST_RANGE_QUANT, this);
-  pc->registerChecker(ProofRule::BV_INTBLAST_BITWISE, this);
 }
 
 Node BVProofRuleChecker::checkInternal(ProofRule id,
@@ -133,15 +132,9 @@ Node BVProofRuleChecker::checkInternal(ProofRule id,
     }
     return ret;
   }
-  else if (id == ProofRule::BV_INTBLAST_STEP)
-  {
-    Assert(children.empty());
-    Assert(args.size() == 3);
-    return args[0];
-  }
-  else if (id == ProofRule::BV_INTBLAST_RANGE
-           || id == ProofRule::BV_INTBLAST_RANGE_QUANT
-           || id == ProofRule::BV_INTBLAST_BITWISE)
+  else if (id == ProofRule::BV_INTBLAST_STEP
+           || id == ProofRule::BV_INTBLAST_RANGE
+           || id == ProofRule::BV_INTBLAST_RANGE_QUANT)
   {
     Assert(children.empty());
     Assert(args.size() == 1);

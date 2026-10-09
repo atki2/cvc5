@@ -20,7 +20,9 @@
 #include "context/cdo.h"
 #include "cvc5/cvc5_proof_rule.h"
 #include "options/smt_options.h"
+#include "proof/conv_proof_generator.h"
 #include "proof/proof_generator.h"
+#include "proof/trust_id.h"
 #include "proof/trust_node.h"
 #include "smt/env_obj.h"
 #include "theory/arith/nl/iand_utils.h"
@@ -138,14 +140,15 @@ class IntBlaster : protected EnvObj, public ProofGenerator
                 std::map<Node, Node>& skolems);
   /**
    * Get proof for fact, where fact may correspond to:
-   * (1) An equality of the form (= n n') where n was rewritten to n' in the
-   * method trustedIntBlast, proven by ProofRule::BV_INTBLAST_STEP.
-   * (2) A range constraint added in addRangeConstraint, proven by
+   * (1) A range constraint added in addRangeConstraint, proven by
    * ProofRule::BV_INTBLAST_RANGE.
-   * (3) A quantified range constraint added in addQuantifiedRangeConstraint,
+   * (2) A quantified range constraint added in addQuantifiedRangeConstraint,
    * proven by ProofRule::BV_INTBLAST_RANGE_QUANT.
-   * (4) A bitwise constraint added in addBitwiseConstraint, proven by
-   * ProofRule::BV_INTBLAST_BITWISE.
+   * (3) A constraint on an integer-and of the bitwise mode, which is either a
+   * range constraint or a bitwise constraint added in addBitwiseConstraint.
+   * It is a trusted step with identifier
+   * TrustId::INT_BLASTER_BITWISE_NOT_SUM_MODE_GRANULARITY_ONE.
+   * The rewrites computed by trustedIntBlast are instead proven by d_tpg.
    */
   std::shared_ptr<ProofNode> getProofFor(Node fact) override;
   /** identify */
@@ -366,6 +369,36 @@ class IntBlaster : protected EnvObj, public ProofGenerator
                            std::vector<TrustNode>& lemmas,
                            std::map<Node, Node>& skolems);
 
+  /**
+   * Adds to d_tpg the rewrite steps justifying the translation of n computed
+   * by trustedIntBlast. The translation of the Boolean connectives of n is
+   * justified by congruence, and the translation of each atom below them by a
+   * step of ProofRule::BV_INTBLAST_STEP, or by a trusted step if
+   * getTrustIdFor returns a trust identifier for it.
+   */
+  void addTranslationSteps(Node n);
+
+  /**
+   * Returns the trust identifier for the translation of atom if it is not
+   * justified by ProofRule::BV_INTBLAST_STEP, and TrustId::NONE otherwise.
+   * This is the case for:
+   * (1) bitwise operators, unless we are using the sum mode with granularity
+   * one.
+   * (2) shift operators, unless we are using the pow2 operator.
+   */
+  TrustId getTrustIdFor(Node atom);
+
+  /**
+   * Returns t with each of its maximal Boolean subterms, which are the
+   * conditions of the bit-vector terms in t, replaced by their translation.
+   * These subterms are added to conds, so that their translation is justified
+   * as well. The map cache stores the subterms of t that were processed
+   * already, which are visited once, as t may be a DAG.
+   */
+  Node replaceConditions(Node t,
+                         std::vector<Node>& conds,
+                         std::unordered_map<Node, Node>& cache);
+
   /** Caches for the different functions */
   CDNodeMap d_binarizeCache;
   CDNodeMap d_intblastCache;
@@ -385,11 +418,13 @@ class IntBlaster : protected EnvObj, public ProofGenerator
   context::CDHashSet<Node> d_bitwiseAssertions;
 
   /**
-   * Maps facts proved by this generator (either translation equalities or
-   * lemmas) to the proof rule that proves them, so that getProofFor can
-   * dispatch to the appropriate rule.
+   * Maps lemmas proved by this generator to the proof rule that proves them,
+   * so that getProofFor can dispatch to the appropriate rule.
    */
   CDNodeRuleMap d_factProofRule;
+
+  /** The proof generator for the rewrites computed by trustedIntBlast */
+  std::unique_ptr<TConvProofGenerator> d_tpg;
 
   /** Useful constants */
   Node d_zero;

@@ -229,6 +229,17 @@ enum class TrustId : uint32_t
    * require the use of theory rewrites to prove.
    */
   MACRO_THEORY_REWRITE_RCONS_SIMPLE,
+  /**
+   * An unproven step from the int-blaster for a bitwise operator (bvand, bvor
+   * or bvxor), which is the case unless we are using --solve-bv-as-int=sum
+   * with --bvand-integer-granularity=1.
+   */
+  INT_BLASTER_BITWISE_NOT_SUM_MODE_GRANULARITY_ONE,
+  /**
+   * An unproven step from the int-blaster for a shift operator (bvshl, bvlshr
+   * or bvashr), which is the case unless we are using --bv-to-int-use-pow2.
+   */
+  INT_BLASTER_SHIFT_WITHOUT_USE_POW2,
   /** Untracked sources of trust, which are discouraged */
   /** A rewrite of the input formula by a preprocessing pass without a proof */
   UNKNOWN_PREPROCESS,

@@ -1427,14 +1427,15 @@ enum ENUM(ProofRule)
    *
    * .. math::
    *
-   *   \inferrule{-\mid F, m, g}{F}
+   *   \inferrule{-\mid F}{F}
    *
-   * where :math:`F` is an equivalence between a predicate over bit-vectors and
-   * its integer translation, computed by the int-blasting preprocessing pass.
-   * :math:`m` and :math:`g` are the values of the options
-   * ``--solve-bv-as-int`` (sum = 1, iand = 2, bv = 3, bitwise = 4) and
-   * ``--bvand-integer-granularity``, which determine the translation of
-   * bitwise operators.
+   * where :math:`F` is an equivalence between an atom over bit-vectors and its
+   * integer translation, computed by the int-blasting preprocessing pass. The
+   * Boolean structure above the atom, as well as the conditions of the
+   * bit-vector terms below it, are translated by congruence instead.
+   * This rule is used for bitwise operators only with the options
+   * ``--solve-bv-as-int=sum`` and ``--bvand-integer-granularity=1``, and for
+   * shift operators only with the option ``--bv-to-int-use-pow2``.
    * \endverbatim
    */
   EVALUE(BV_INTBLAST_STEP),
@@ -1447,9 +1448,11 @@ enum ENUM(ProofRule)
    *   \inferrule{-\mid F}{F}
    *
    * where :math:`F` is the constraint :math:`0 \leq k < 2^n` on an integer
-   * variable :math:`k` introduced by the int-blasting preprocessing pass, which
-   * is either the purification of a bit-vector variable of width :math:`n`, or
-   * the purification of an integer-and of width :math:`n`.
+   * term :math:`k` introduced by the int-blasting preprocessing pass, which is
+   * either the purification of a bit-vector variable of width :math:`n`, the
+   * purification of an integer-and of width :math:`n`, or an application of
+   * the integer function introduced for a function whose return type is a
+   * bit-vector of width :math:`n`.
    * \endverbatim
    */
   EVALUE(BV_INTBLAST_RANGE),
@@ -1471,20 +1474,6 @@ enum ENUM(ProofRule)
    * \endverbatim
    */
   EVALUE(BV_INTBLAST_RANGE_QUANT),
-  /**
-   * \verbatim embed:rst:leading-asterisk
-   * **Bit-vectors -- Int-blasting bitwise constraint**
-   *
-   * .. math::
-   *
-   *   \inferrule{-\mid F}{F}
-   *
-   * where :math:`F` is a bitwise constraint introduced by the int-blasting
-   * preprocessing pass when translating bit-wise operators. This rule is a
-   * placeholder that does not yet check the correctness of :math:`F`.
-   * \endverbatim
-   */
-  EVALUE(BV_INTBLAST_BITWISE),
   /**
    * \verbatim embed:rst:leading-asterisk
    * **Datatypes -- Split**
