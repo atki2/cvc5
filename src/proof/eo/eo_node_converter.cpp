@@ -686,6 +686,7 @@ bool EoNodeConverter::isHandledSkolemId(SkolemId id)
   {
     case SkolemId::PURIFY:
     case SkolemId::ARRAY_DEQ_DIFF:
+    case SkolemId::BV_TO_INT_UF:
     case SkolemId::BV_EMPTY:
     case SkolemId::DIV_BY_ZERO:
     case SkolemId::INT_DIV_BY_ZERO:

@@ -22,3 +22,31 @@
 ; note: We use this as an alias for int_to_bv, as the two have the same semantics.
 ; note: The order of arguments swaps.
 (define @bv ((value Int) (w Int)) (int_to_bv w value))
+
+; program: $bv_to_int_type
+; args:
+; - T Type: The type to convert.
+; return: Int if T is a bitvector type, T otherwise.
+(program $bv_to_int_type ((T Type) (n Int))
+  :signature (Type) Type
+  (
+  (($bv_to_int_type (BitVec n)) Int)
+  (($bv_to_int_type T)          T)
+  )
+)
+
+; program: $bv_to_int_uf_type
+; args:
+; - T Type: The type of a function.
+; return: T where each bitvector argument type and return type is replaced by Int.
+(program $bv_to_int_uf_type ((T Type) (U Type))
+  :signature (Type) Type
+  (
+  (($bv_to_int_uf_type (-> T U)) (-> ($bv_to_int_type T) ($bv_to_int_uf_type U)))
+  (($bv_to_int_uf_type T)        ($bv_to_int_type T))
+  )
+)
+
+; The function over integers that int-blasting introduces for the function f.
+(declare-parameterized-const @bv_to_int_uf ((T Type :implicit) (f T))
+  ($bv_to_int_uf_type T))
