@@ -281,18 +281,22 @@
 ; implements: ProofRule::BV_INTBLAST_STEP.
 ; args:
 ; - eq Bool: The equality to prove.
-; - md Int: The value of --solve-bv-as-int.
-; - gr Int: The value of --bvand-integer-granularity.
 ; requires: >
 ;   We require that $bv_mk_intblast_step applied to the left hand side returns
 ;   the right hand side.
 ; conclusion: The given equality.
 ; note: >
+;   The left hand side is an atom whose Boolean conditions are already
+;   int-blasted, since the Boolean structure above the atom and the conditions
+;   of its bit-vector terms are int-blasted by congruence.
+;   This rule is used for bitwise operators only with the options
+;   --solve-bv-as-int=sum and --bvand-integer-granularity=1, and for shift
+;   operators only with the option --bv-to-int-use-pow2.
 ;   The current implementation only covers some of the operators that may
 ;   appear in ProofRule::BV_INTBLAST_STEP.
-(declare-rule bv_intblast_step ((a Bool) (b Bool) (md Int) (gr Int))
-  :args ((= a b) md gr)
-  :requires ((($bv_mk_intblast_step a md gr) b))
+(declare-rule bv_intblast_step ((a Bool) (b Bool))
+  :args ((= a b))
+  :requires ((($bv_mk_intblast_step a) b))
   :conclusion (= a b)
 )
 
@@ -302,12 +306,12 @@
 ; implements: ProofRule::BV_INTBLAST_RANGE.
 ; args:
 ; - F Bool: The range constraint to prove.
-; requires: We require that $bv_intblast_range_bound applied to t returns b.
+; requires: We require that $bv_intblast_range_bound applied to k returns b.
 ; conclusion: The given range constraint.
-(declare-rule bv_intblast_range ((t Int) (b Int))
-  :args ((and (>= (@purify t) 0) (not (>= (@purify t) b))))
-  :requires ((($bv_intblast_range_bound t) b))
-  :conclusion (and (>= (@purify t) 0) (not (>= (@purify t) b)))
+(declare-rule bv_intblast_range ((k Int) (b Int))
+  :args ((and (>= k 0) (not (>= k b))))
+  :requires ((($bv_intblast_range_bound k) b))
+  :conclusion (and (>= k 0) (not (>= k b)))
 )
 
 ;;;;; ProofRule::BV_INTBLAST_RANGE_QUANT
@@ -321,19 +325,6 @@
 ;   This rule does not check F, since the bit-width that bounds F is not
 ;   recoverable from the int-blasted function.
 (declare-rule bv_intblast_range_quant ((F Bool))
-  :args (F)
-  :conclusion F
-)
-
-;;;;; ProofRule::BV_INTBLAST_BITWISE
-
-; rule: bv_intblast_bitwise
-; implements: ProofRule::BV_INTBLAST_BITWISE.
-; args:
-; - F Bool: The bitwise constraint to prove.
-; conclusion: The given formula F.
-; note: This rule does not yet check F.
-(declare-rule bv_intblast_bitwise ((F Bool))
   :args (F)
   :conclusion F
 )
