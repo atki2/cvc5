@@ -527,7 +527,7 @@
   (
   (($bv_mk_intblast_step (= a1 a2))      ($bv_mk_intblast_step_eq a1 a2))
   (($bv_mk_intblast_step (bvult a1 a2))  ($bv_intblast_ult a1 a2))
-  (($bv_mk_intblast_step (bvslt a1 a2))  ($bv_intblast_slt a1 a2)) ; Check if redundent
+  (($bv_mk_intblast_step (bvslt a1 a2))  ($bv_intblast_slt a1 a2))
   (($bv_mk_intblast_step (bvuaddo a1 a2)) ($bv_mk_intblast_step_uaddo a1 a2))
   (($bv_mk_intblast_step (bvsaddo a1 a2)) ($bv_mk_intblast_step_saddo a1 a2))
   (($bv_mk_intblast_step (bvumulo a1 a2)) ($bv_mk_intblast_step_umulo a1 a2))
