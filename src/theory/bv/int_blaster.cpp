@@ -1077,11 +1077,14 @@ Node IntBlaster::castToType(Node n, TypeNode tn)
   // casting integers to bit-vectors
   if (n.getType().isInteger())
   {
+    Assert(tn.isBitVector());
     unsigned bvsize = tn.getBitVectorSize();
     Node intToBVOp = d_nm->mkConst<IntToBitVector>(IntToBitVector(bvsize));
     return d_nm->mkNode(intToBVOp, n);
   }
   // casting bit-vectors to ingers
+  Assert(n.getType().isBitVector());
+  Assert(tn.isInteger());
   return d_nm->mkNode(Kind::BITVECTOR_UBV_TO_INT, n);
 }
 
