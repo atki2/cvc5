@@ -336,10 +336,7 @@ void IntBlaster::addTranslationSteps(Node n)
       continue;
     }
     Assert(cur.getType().isBoolean());
-    Kind k = cur.getKind();
-    if (k == Kind::NOT || k == Kind::AND || k == Kind::OR || k == Kind::IMPLIES
-        || k == Kind::XOR || k == Kind::ITE
-        || (k == Kind::EQUAL && cur[0].getType().isBoolean()))
+    if (expr::isBooleanConnective(cur))
     {
       // Boolean connectives are translated to themselves applied to the
       // translation of their children, which is proven by congruence.
