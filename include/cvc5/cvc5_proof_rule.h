@@ -1429,10 +1429,10 @@ enum ENUM(ProofRule)
    *
    *   \inferrule{-\mid F}{F}
    *
-   * where :math:`F` is an equivalence between an atom over bit-vectors and its
-   * integer translation, computed by the int-blasting preprocessing pass. The
-   * Boolean structure above the atom, as well as the conditions of the
-   * bit-vector terms below it, are translated by congruence instead.
+   * where :math:`F` is an equivalence between an atom over bit-vectors, which
+   * may be a quantified formula, and its integer translation, computed by the
+   * int-blasting preprocessing pass. The Boolean structure above the atom is
+   * translated by congruence instead.
    * This rule is used for bitwise operators only with the options
    * ``--solve-bv-as-int=sum`` and ``--bvand-integer-granularity=1``, and for
    * shift operators only with the option ``--bv-to-int-use-pow2``.
@@ -1468,9 +1468,7 @@ enum ENUM(ProofRule)
    * :math:`\forall x_1 \dots x_m.\; 0 \leq f(x_1,\dots,x_m) < 2^n` on the
    * integer function :math:`f` that the int-blasting preprocessing pass
    * introduced for an uninterpreted function whose range is a bit-vector sort
-   * of width :math:`n`. This rule is a placeholder that does not yet check the
-   * correctness of :math:`F`, since the bit-width :math:`n` is not recoverable
-   * from the printed form of :math:`f`.
+   * of width :math:`n`.
    * \endverbatim
    */
   EVALUE(BV_INTBLAST_RANGE_QUANT),

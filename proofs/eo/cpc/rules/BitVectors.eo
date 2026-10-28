@@ -286,9 +286,8 @@
 ;   the right hand side.
 ; conclusion: The given equality.
 ; note: >
-;   The left hand side is an atom whose Boolean conditions are already
-;   int-blasted, since the Boolean structure above the atom and the conditions
-;   of its bit-vector terms are int-blasted by congruence.
+;   The left hand side is an atom, which may be a quantified formula, since the
+;   Boolean structure above atoms is int-blasted by congruence.
 ;   This rule is used for bitwise operators only with the options
 ;   --solve-bv-as-int=sum and --bvand-integer-granularity=1, and for shift
 ;   operators only with the option --bv-to-int-use-pow2.
@@ -320,11 +319,10 @@
 ; implements: ProofRule::BV_INTBLAST_RANGE_QUANT.
 ; args:
 ; - F Bool: The quantified range constraint to prove.
-; conclusion: The given formula F.
-; note: >
-;   This rule does not check F, since the bit-width that bounds F is not
-;   recoverable from the int-blasted function.
-(declare-rule bv_intblast_range_quant ((F Bool))
-  :args (F)
-  :conclusion F
+; requires: We require that $bv_intblast_range_bound applied to k returns b.
+; conclusion: The given quantified range constraint.
+(declare-rule bv_intblast_range_quant ((xs @List) (k Int) (b Int))
+  :args ((forall xs (and (>= k 0) (not (>= k b)))))
+  :requires ((($bv_intblast_range_bound k) b))
+  :conclusion (forall xs (and (>= k 0) (not (>= k b))))
 )

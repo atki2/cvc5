@@ -357,27 +357,11 @@ void IntBlaster::addTranslationSteps(Node n)
           << "- unchanged, no step needed: " << cur << std::endl;
       continue;
     }
-    // cur is an atom. The translation of the Boolean conditions of its
-    // bit-vector terms is proven by congruence as well, so that the step below
-    // is applied at post-rewrite, on the atom whose conditions are already
-    // translated.
-    std::vector<Node> conds;
-    Node cura = cur;
-    if (!cur.isClosure())
-    {
-      std::unordered_map<Node, Node> cache;
-      NodeBuilder builder(nodeManager(), cur.getKind());
-      if (cur.getMetaKind() == kind::metakind::PARAMETERIZED)
-      {
-        builder << cur.getOperator();
-      }
-      for (const Node& curc : cur)
-      {
-        builder << replaceConditions(curc, conds, cache);
-      }
-      cura = builder.constructNode();
-    }
-    TrustId tid = getTrustIdFor(cura);
+    // cur is an atom, whose translation is proven by one step, including the
+    // conditions of its bit-vector terms and the body of a quantified formula.
+    // The step is applied at pre-rewrite, so that the subterms of cur are not
+    // rewritten on their own.
+    TrustId tid = getTrustIdFor(cur);
     Trace("int-blaster-proof") << "- atom, proven by ";
     if (tid == TrustId::NONE)
     {
@@ -387,26 +371,16 @@ void IntBlaster::addTranslationSteps(Node n)
     {
       Trace("int-blaster-proof") << "trusted step " << tid;
     }
-    Trace("int-blaster-proof") << ": " << cura << " = " << t << std::endl;
-    if (TraceIsOn("int-blaster-proof"))
-    {
-      for (const Node& c : conds)
-      {
-        Trace("int-blaster-proof")
-            << "  - condition of a bit-vector term, proven on its own: " << c
-            << std::endl;
-      }
-    }
+    Trace("int-blaster-proof") << ": " << cur << " = " << t << std::endl;
     if (tid == TrustId::NONE)
     {
       d_tpg->addRewriteStep(
-          cura, t, ProofRule::BV_INTBLAST_STEP, {}, {cura.eqNode(t)}, false);
+          cur, t, ProofRule::BV_INTBLAST_STEP, {}, {cur.eqNode(t)}, true);
     }
     else
     {
-      d_tpg->addRewriteStep(cura, t, nullptr, false, tid);
+      d_tpg->addRewriteStep(cur, t, nullptr, true, tid);
     }
-    toVisit.insert(toVisit.end(), conds.begin(), conds.end());
   }
 }
 
@@ -426,41 +400,6 @@ TrustId IntBlaster::getTrustIdFor(Node atom)
     return TrustId::INT_BLASTER_SHIFT_WITHOUT_USE_POW2;
   }
   return TrustId::NONE;
-}
-
-Node IntBlaster::replaceConditions(Node t,
-                                   std::vector<Node>& conds,
-                                   std::unordered_map<Node, Node>& cache)
-{
-  std::unordered_map<Node, Node>::const_iterator itc = cache.find(t);
-  if (itc != cache.end())
-  {
-    return itc->second;
-  }
-  Node ret = t;
-  if (t.getType().isBoolean())
-  {
-    // a condition of a bit-vector term, which is translated on its own
-    conds.push_back(t);
-    CDNodeMap::const_iterator it = d_intblastCache.find(t);
-    Assert(it != d_intblastCache.end());
-    ret = (*it).second;
-  }
-  else if (t.getNumChildren() > 0 && !t.isClosure())
-  {
-    NodeBuilder builder(nodeManager(), t.getKind());
-    if (t.getMetaKind() == kind::metakind::PARAMETERIZED)
-    {
-      builder << t.getOperator();
-    }
-    for (const Node& tc : t)
-    {
-      builder << replaceConditions(tc, conds, cache);
-    }
-    ret = builder.constructNode();
-  }
-  cache[t] = ret;
-  return ret;
 }
 
 Node IntBlaster::intBlast(Node n,

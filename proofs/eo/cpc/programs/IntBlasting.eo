@@ -3,12 +3,15 @@
 (include "../programs/Nary.eo")
 (include "../theories/ArithBvConv.eo")
 (include "../theories/Ints.eo")
+(include "../theories/Quantifiers.eo")
 
 ; forward declarations, since the programs below are mutually recursive
 (program $bv_mk_intblast_step_term ((n Int) (a (BitVec n)))
   :signature ((BitVec n)) Int)
 (program $bv_mk_intblast_step_non_bv ((S Type) (t S))
   :signature (S) S)
+(program $bv_mk_intblast_step ((f Bool))
+  :signature (Bool) Bool)
 
 ; program: $bv_intblast_is_bv_type
 ; args:
@@ -334,12 +337,12 @@
 
 ; define: $bv_mk_intblast_step_ite
 ; args:
-; - c Bool: The condition, which is already int-blasted.
+; - c Bool: The condition.
 ; - x (BitVec n): The then branch.
 ; - y (BitVec n): The else branch.
 ; return: the int-blasted term for (ite c x y).
 (define $bv_mk_intblast_step_ite ((n Int :implicit) (c Bool) (x (BitVec n)) (y (BitVec n)))
-  (ite c ($bv_mk_intblast_step_term x) ($bv_mk_intblast_step_term y)))
+  (ite ($bv_mk_intblast_step c) ($bv_mk_intblast_step_term x) ($bv_mk_intblast_step_term y)))
 
 ; define: $bv_mk_intblast_step_bvite
 ; args:
@@ -384,6 +387,13 @@
 (define $bv_mk_intblast_step_var ((n Int :implicit) (a (BitVec n)))
   (@purify (ubv_to_int a)))
 
+; define: $bv_mk_intblast_step_bound_var
+; args:
+; - a (BitVec n): The bitvector variable to int-blast, which is bound by a quantifier.
+; return: the int-blasted term for variable a, which is the integer variable a_int.
+(define $bv_mk_intblast_step_bound_var ((n Int :implicit) (a (BitVec n)))
+  (eo::var (eo::concat (eo::nameof a) "_int") Int))
+
 ;;; range
 
 ; program: $bv_intblast_return_type
@@ -419,13 +429,11 @@
 ; define: $bv_mk_intblast_step_arg
 ; args:
 ; - t T: An argument of an application.
-; return: >
-;   t if it is Boolean, since it is already int-blasted, and the int-blasted
-;   term for t otherwise.
+; return: the int-blasted term for t.
 (define $bv_mk_intblast_step_arg ((T Type :implicit) (t T))
   (eo::define ((U (eo::typeof t)))
     (eo::ite (eo::eq U Bool)
-      t
+      ($bv_mk_intblast_step t)
       (eo::ite ($bv_intblast_is_bv_type U)
         ($bv_mk_intblast_step_term t)
         ($bv_mk_intblast_step_non_bv t)))))
@@ -479,6 +487,50 @@
 (define $bv_mk_intblast_step_int_to_bv ((w Int) (t Int))
   (mod_total ($bv_mk_intblast_step_non_bv t) ($arith_eval_int_pow_2 w)))
 
+;;; quantifiers
+
+; program: $bv_intblast_forall_vars
+; args:
+; - xs @List: The variables bound by a quantifier.
+; return: xs, where each bitvector variable is replaced by its int-blasted variable.
+(program $bv_intblast_forall_vars ((T Type) (x T) (xs @List :list))
+  :signature (@List) @List
+  (
+  (($bv_intblast_forall_vars @list.nil)    @list.nil)
+  (($bv_intblast_forall_vars (@list x xs)) (_ @list
+                                              (eo::ite ($bv_intblast_is_bv_type (eo::typeof x)) ($bv_mk_intblast_step_bound_var x) x)
+                                              ($bv_intblast_forall_vars xs)))
+  )
+)
+
+; program: $bv_intblast_forall_ranges
+; args:
+; - xs @List: The variables bound by a quantifier.
+; return: the conjunction of the range constraints of the int-blasted variables of the bitvector variables in xs.
+(program $bv_intblast_forall_ranges ((T Type) (x T) (xs @List :list))
+  :signature (@List) Bool
+  (
+  (($bv_intblast_forall_ranges @list.nil)    true)
+  (($bv_intblast_forall_ranges (@list x xs)) (eo::define ((r ($bv_intblast_forall_ranges xs)))
+                                                (eo::ite ($bv_intblast_is_bv_type (eo::typeof x))
+                                                  (eo::define ((k ($bv_mk_intblast_step_bound_var x)))
+                                                  (eo::define ((p ($arith_eval_int_pow_2 ($bv_bitwidth (eo::typeof x)))))
+                                                    (_ and (and (>= k 0) (not (>= k p))) r)))
+                                                  r)))
+  )
+)
+
+; define: $bv_mk_intblast_step_forall
+; args:
+; - xs @List: The variables bound by the quantifier.
+; - F Bool: The body of the quantifier.
+; return: >
+;   the int-blasted formula for (forall xs F), whose body assumes the range
+;   constraints of the int-blasted variables.
+(define $bv_mk_intblast_step_forall ((xs @List) (F Bool))
+  (forall ($bv_intblast_forall_vars xs)
+    (=> (eo::list_singleton_elim and ($bv_intblast_forall_ranges xs)) ($bv_mk_intblast_step F))))
+
 ;;; $bv_mk_intblast_step_term
 
 ; program: $bv_mk_intblast_step_term
@@ -511,7 +563,9 @@
   (($bv_mk_intblast_step_term (g t))            ($bv_mk_intblast_step_non_bv (g t)))    ; otherwise an application of a function
   (($bv_mk_intblast_step_term a1)               (eo::ite (eo::is_bin a1)
                                                   ($bv_mk_intblast_step_const a1)
-                                                  ($bv_mk_intblast_step_var a1)))    ; otherwise assume a variable
+                                                  (eo::ite (eo::is_var a1)
+                                                    ($bv_mk_intblast_step_bound_var a1)
+                                                    ($bv_mk_intblast_step_var a1))))    ; otherwise assume a variable
   )
 )
 
@@ -519,12 +573,15 @@
 
 ; program: $bv_mk_intblast_step
 ; args:
-; - a Bool: The predicate to int-blast, which is an atom, since the Boolean
-;   connectives above it are int-blasted by congruence.
+; - a Bool: >
+;   The formula to int-blast. In an assertion it is an atom, since the Boolean
+;   connectives above atoms are int-blasted by congruence. Inside an atom or a
+;   quantifier, the Boolean connectives are int-blasted like other operators.
 ; return: the int-blasted term for a.
-(program $bv_mk_intblast_step ((n Int) (a1 (BitVec n)) (a2 (BitVec n)) (f Bool))
+(program $bv_mk_intblast_step ((n Int) (a1 (BitVec n)) (a2 (BitVec n)) (f Bool) (xs @List))
   :signature (Bool) Bool
   (
+  (($bv_mk_intblast_step (forall xs f))  ($bv_mk_intblast_step_forall xs f))
   (($bv_mk_intblast_step (= a1 a2))      ($bv_mk_intblast_step_eq a1 a2))
   (($bv_mk_intblast_step (bvult a1 a2))  ($bv_intblast_ult a1 a2))
   (($bv_mk_intblast_step (bvslt a1 a2))  ($bv_intblast_slt a1 a2))

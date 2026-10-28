@@ -372,9 +372,10 @@ class IntBlaster : protected EnvObj, public ProofGenerator
   /**
    * Adds to d_tpg the rewrite steps justifying the translation of n computed
    * by trustedIntBlast. The translation of the Boolean connectives of n is
-   * justified by congruence, and the translation of each atom below them by a
-   * step of ProofRule::BV_INTBLAST_STEP, or by a trusted step if
-   * getTrustIdFor returns a trust identifier for it.
+   * justified by congruence, and the translation of each atom below them,
+   * including the conditions of its bit-vector terms and the body of a
+   * quantified formula, by a step of ProofRule::BV_INTBLAST_STEP, or by a
+   * trusted step if getTrustIdFor returns a trust identifier for it.
    */
   void addTranslationSteps(Node n);
 
@@ -387,17 +388,6 @@ class IntBlaster : protected EnvObj, public ProofGenerator
    * (2) shift operators, unless we are using the pow2 operator.
    */
   TrustId getTrustIdFor(Node atom);
-
-  /**
-   * Returns t with each of its maximal Boolean subterms, which are the
-   * conditions of the bit-vector terms in t, replaced by their translation.
-   * These subterms are added to conds, so that their translation is justified
-   * as well. The map cache stores the subterms of t that were processed
-   * already, which are visited once, as t may be a DAG.
-   */
-  Node replaceConditions(Node t,
-                         std::vector<Node>& conds,
-                         std::unordered_map<Node, Node>& cache);
 
   /** Caches for the different functions */
   CDNodeMap d_binarizeCache;
