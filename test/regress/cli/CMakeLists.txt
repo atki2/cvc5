@@ -382,6 +382,7 @@ set(regress_0_tests
   regress0/bv/bv_to_int_range_1bit.smt2
   regress0/bv/bv_to_int_shifts_pow2.smt2
   regress0/bv/bv_to_int_sign_extend.smt2
+  regress0/bv/bv_to_int_uf_range.smt2
   regress0/bv/bv_to_int_xor_not.smt2
   regress0/bv/bv_to_int_zext.smt2
   regress0/bv/bv_to_bool_conflict.smt2

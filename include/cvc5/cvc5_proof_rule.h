@@ -1449,10 +1449,8 @@ enum ENUM(ProofRule)
    *
    * where :math:`F` is the constraint :math:`0 \leq k < 2^n` on an integer
    * term :math:`k` introduced by the int-blasting preprocessing pass, which is
-   * either the purification of a bit-vector variable of width :math:`n`, the
-   * purification of an integer-and of width :math:`n`, or an application of
-   * the integer function introduced for a function whose return type is a
-   * bit-vector of width :math:`n`.
+   * an application of the integer function introduced for a function whose
+   * return type is a bit-vector of width :math:`n`.
    * \endverbatim
    */
   EVALUE(BV_INTBLAST_RANGE),
@@ -1472,6 +1470,18 @@ enum ENUM(ProofRule)
    * \endverbatim
    */
   EVALUE(BV_INTBLAST_RANGE_QUANT),
+  /**
+   * \verbatim embed:rst:leading-asterisk
+   * **Bit-vectors -- Range of the unsigned integer value**
+   *
+   * .. math::
+   *
+   *   \inferrule{-\mid t}{0 \leq \texttt{ubv_to_int}(t) < 2^n}
+   *
+   * where :math:`t` is a bit-vector term of width :math:`n`.
+   * \endverbatim
+   */
+  EVALUE(UBV_RANGE),
   /**
    * \verbatim embed:rst:leading-asterisk
    * **Datatypes -- Split**

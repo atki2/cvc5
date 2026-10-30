@@ -410,15 +410,11 @@
 
 ; program: $bv_intblast_range_bound
 ; args:
-; - k S: >
-;   The term of a range constraint, which is either the integer variable
-;   introduced for a bitvector variable or an application of an int-blasted
-;   function.
+; - k S: The term of a range constraint, which is an application of an int-blasted function.
 ; return: two raised to the bit-width of the bitvector that k stands for.
-(program $bv_intblast_range_bound ((T Type) (S Type) (U Type) (n Int) (x (BitVec n)) (f U) (g (-> T S)) (a T))
+(program $bv_intblast_range_bound ((T Type) (S Type) (U Type) (f U) (g (-> T S)) (a T))
   :signature (S) Int
   (
-  (($bv_intblast_range_bound (@purify (ubv_to_int x))) ($arith_eval_int_pow_2 ($bv_bitwidth (eo::typeof x))))
   (($bv_intblast_range_bound (@bv_to_int_uf f))        ($arith_eval_int_pow_2 ($bv_bitwidth ($bv_intblast_return_type (eo::typeof f)))))
   (($bv_intblast_range_bound (g a))                    ($bv_intblast_range_bound g))
   )

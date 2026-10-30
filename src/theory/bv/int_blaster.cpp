@@ -25,6 +25,7 @@
 #include "options/uf_options.h"
 #include "proof/proof.h"
 #include "smt/logic_exception.h"
+#include "theory/bv/proof_checker.h"
 #include "theory/bv/theory_bv_utils.h"
 #include "theory/logic_info.h"
 #include "theory/rewriter.h"
@@ -86,6 +87,16 @@ std::shared_ptr<ProofNode> IntBlaster::getProofFor(Node fact)
     Assert(d_mode == options::SolveBVAsIntMode::BITWISE);
     cdp.addTrustedStep(fact, TrustId::INT_BLASTER_BITWISE_NOT_SUM_MODE_GRANULARITY_ONE, {}, {});
   }
+  else if ((*it).second == ProofRule::UBV_RANGE)
+  {
+    // the range constraint of the purification k of (ubv_to_int t) follows
+    // from the range of (ubv_to_int t), since k is equivalent to it
+    Assert(fact.getKind() == Kind::AND && fact[0].getKind() == Kind::GEQ);
+    Node t = SkolemManager::getUnpurifiedForm(fact[0][0])[0];
+    Node range = BVProofRuleChecker::mkUbvRange(nodeManager(), t);
+    cdp.addStep(range, ProofRule::UBV_RANGE, {}, {t});
+    cdp.addStep(fact, ProofRule::MACRO_SR_PRED_TRANSFORM, {range}, {fact});
+  }
   else
   {
     cdp.addStep(fact, (*it).second, {}, {fact});
@@ -107,15 +118,22 @@ void IntBlaster::addRangeConstraint(Node node,
     Trace("int-blaster-debug")
         << "node added to cache and constraints added to lemmas " << std::endl;
     d_rangeNodes.insert(node);
-    // the range of the purification of an integer-and, which is introduced in
-    // the bitwise mode, is not justified by a proof rule
     SkolemId id;
     Node cacheVal;
     if (!SkolemManager::isSkolemFunction(node, id, cacheVal)
-        || id != SkolemId::PURIFY || cacheVal.getKind() != Kind::IAND)
+        || id != SkolemId::PURIFY)
     {
+      // an application of an int-blasted function
       d_factProofRule.insert(rangeConstraint, ProofRule::BV_INTBLAST_RANGE);
     }
+    else if (cacheVal.getKind() == Kind::BITVECTOR_UBV_TO_INT)
+    {
+      // the purification of a bit-vector variable, whose range follows from
+      // the range of ubv_to_int
+      d_factProofRule.insert(rangeConstraint, ProofRule::UBV_RANGE);
+    }
+    // otherwise, the range of the purification of an integer-and, which is
+    // introduced in the bitwise mode, is not justified by a proof rule
     TrustNode trn = TrustNode::mkTrustLemma(rangeConstraint, this);
     lemmas.push_back(trn);
   }

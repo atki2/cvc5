@@ -33,6 +33,16 @@ void BVProofRuleChecker::registerTo(ProofChecker* pc)
   pc->registerChecker(ProofRule::BV_INTBLAST_STEP, this);
   pc->registerChecker(ProofRule::BV_INTBLAST_RANGE, this);
   pc->registerChecker(ProofRule::BV_INTBLAST_RANGE_QUANT, this);
+  pc->registerChecker(ProofRule::UBV_RANGE, this);
+}
+
+Node BVProofRuleChecker::mkUbvRange(NodeManager* nm, Node t)
+{
+  Node u = nm->mkNode(Kind::BITVECTOR_UBV_TO_INT, t);
+  Integer p = Integer(2).pow(t.getType().getBitVectorSize());
+  return nm->mkNode(Kind::AND,
+                    nm->mkNode(Kind::LEQ, nm->mkConstInt(Rational(0)), u),
+                    nm->mkNode(Kind::LT, u, nm->mkConstInt(Rational(p))));
 }
 
 Node BVProofRuleChecker::checkInternal(ProofRule id,
@@ -140,6 +150,16 @@ Node BVProofRuleChecker::checkInternal(ProofRule id,
     Assert(args.size() == 1);
     // placeholder rules for int-blasting proofs, accept any fact
     return args[0];
+  }
+  else if (id == ProofRule::UBV_RANGE)
+  {
+    Assert(children.empty());
+    Assert(args.size() == 1);
+    if (!args[0].getType().isBitVector())
+    {
+      return Node::null();
+    }
+    return mkUbvRange(nodeManager(), args[0]);
   }
   // no rule
   return Node::null();
