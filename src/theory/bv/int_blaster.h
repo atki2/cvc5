@@ -20,7 +20,6 @@
 #include "context/cdo.h"
 #include "cvc5/cvc5_proof_rule.h"
 #include "options/smt_options.h"
-#include "proof/conv_proof_generator.h"
 #include "proof/proof_generator.h"
 #include "proof/trust_id.h"
 #include "proof/trust_node.h"
@@ -28,6 +27,8 @@
 #include "theory/arith/nl/iand_utils.h"
 
 namespace cvc5::internal {
+
+class TConvProofGenerator;
 
 /*
 ** Converts bit-vector formulas to integer formulas.
@@ -140,15 +141,17 @@ class IntBlaster : protected EnvObj, public ProofGenerator
                 std::map<Node, Node>& skolems);
   /**
    * Get proof for fact, where fact may correspond to:
-   * (1) A range constraint added in addRangeConstraint, proven by
-   * ProofRule::BV_INTBLAST_RANGE.
-   * (2) A quantified range constraint added in addQuantifiedRangeConstraint,
+   * (1) An equality of the form (= n n') where n was rewritten to n' in the
+   * method trustedIntBlast, proven by the steps of addTranslationSteps.
+   * (2) A range constraint added in addRangeConstraint, proven by
+   * ProofRule::UBV_RANGE for a bit-vector variable and by
+   * ProofRule::BV_INTBLAST_RANGE for a function application.
+   * (3) A quantified range constraint added in addQuantifiedRangeConstraint,
    * proven by ProofRule::BV_INTBLAST_RANGE_QUANT.
-   * (3) A constraint on an integer-and of the bitwise mode, which is either a
+   * (4) A constraint on an integer-and of the bitwise mode, which is either a
    * range constraint or a bitwise constraint added in addBitwiseConstraint.
    * It is a trusted step with identifier
    * TrustId::INT_BLASTER_BITWISE_NOT_SUM_MODE_GRANULARITY_ONE.
-   * The rewrites computed by trustedIntBlast are instead proven by d_tpg.
    */
   std::shared_ptr<ProofNode> getProofFor(Node fact) override;
   /** identify */
@@ -370,14 +373,14 @@ class IntBlaster : protected EnvObj, public ProofGenerator
                            std::map<Node, Node>& skolems);
 
   /**
-   * Adds to d_tpg the rewrite steps justifying the translation of n computed
+   * Adds to tpg the rewrite steps justifying the translation of n computed
    * by trustedIntBlast. The translation of the Boolean connectives of n is
    * justified by congruence, and the translation of each atom below them,
    * including the conditions of its bit-vector terms and the body of a
    * quantified formula, by a step of ProofRule::BV_INTBLAST_STEP, or by a
    * trusted step if getTrustIdFor returns a trust identifier for it.
    */
-  void addTranslationSteps(Node n);
+  void addTranslationSteps(Node n, TConvProofGenerator& tpg);
 
   /**
    * Returns the trust identifier for the translation of atom if it is not
@@ -412,9 +415,6 @@ class IntBlaster : protected EnvObj, public ProofGenerator
    * so that getProofFor can dispatch to the appropriate rule.
    */
   CDNodeRuleMap d_factProofRule;
-
-  /** The proof generator for the rewrites computed by trustedIntBlast */
-  std::unique_ptr<TConvProofGenerator> d_tpg;
 
   /** Useful constants */
   Node d_zero;

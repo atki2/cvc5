@@ -23,6 +23,7 @@
 #include "expr/node_traversal.h"
 #include "expr/skolem_manager.h"
 #include "options/uf_options.h"
+#include "proof/conv_proof_generator.h"
 #include "proof/proof.h"
 #include "smt/logic_exception.h"
 #include "theory/bv/proof_checker.h"
@@ -64,20 +65,27 @@ IntBlaster::IntBlaster(Env& env,
   d_one = d_nm->mkConstInt(1);
   Assert(granularity <= 8);
   d_granularity = static_cast<uint32_t>(granularity);
-  if (options().smt.produceProofs)
-  {
-    d_tpg.reset(new TConvProofGenerator(d_env,
-                                        userContext(),
-                                        TConvPolicy::ONCE,
-                                        TConvCachePolicy::NEVER,
-                                        "IntBlaster::tpg"));
-  }
 };
 
 IntBlaster::~IntBlaster() {}
 
 std::shared_ptr<ProofNode> IntBlaster::getProofFor(Node fact)
 {
+  if (fact.getKind() == Kind::EQUAL)
+  {
+    CDNodeMap::const_iterator itt = d_intblastCache.find(fact[0]);
+    if (itt != d_intblastCache.end() && (*itt).second == fact[1])
+    {
+      // a rewrite computed by trustedIntBlast
+      TConvProofGenerator tpg(d_env,
+                              nullptr,
+                              TConvPolicy::ONCE,
+                              TConvCachePolicy::NEVER,
+                              "IntBlaster::tpg");
+      addTranslationSteps(fact[0], tpg);
+      return tpg.getProofFor(fact);
+    }
+  }
   CDProof cdp(d_env);
   CDNodeRuleMap::const_iterator it = d_factProofRule.find(fact);
   if (it == d_factProofRule.end())
@@ -105,6 +113,83 @@ std::shared_ptr<ProofNode> IntBlaster::getProofFor(Node fact)
 }
 
 std::string IntBlaster::identify() const { return "IntBlaster"; }
+
+void IntBlaster::addTranslationSteps(Node n, TConvProofGenerator& tpg)
+{
+  Trace("int-blaster-proof") << "add proof steps for: " << n << std::endl;
+  std::unordered_set<Node> visited;
+  std::vector<Node> toVisit{n};
+  while (!toVisit.empty())
+  {
+    Node cur = toVisit.back();
+    toVisit.pop_back();
+    if (!visited.insert(cur).second)
+    {
+      continue;
+    }
+    Assert(cur.getType().isBoolean());
+    if (expr::isBooleanConnective(cur))
+    {
+      // Boolean connectives are translated to themselves applied to the
+      // translation of their children, which is proven by congruence.
+      Trace("int-blaster-proof")
+          << "- connective, proven by congruence: " << cur << std::endl;
+      toVisit.insert(toVisit.end(), cur.begin(), cur.end());
+      continue;
+    }
+    CDNodeMap::const_iterator it = d_intblastCache.find(cur);
+    Assert(it != d_intblastCache.end());
+    Node t = (*it).second;
+    if (t == cur)
+    {
+      Trace("int-blaster-proof")
+          << "- unchanged, no step needed: " << cur << std::endl;
+      continue;
+    }
+    // cur is an atom, whose translation is proven by one step, including the
+    // conditions of its bit-vector terms and the body of a quantified formula.
+    // The step is applied at pre-rewrite, so that the subterms of cur are not
+    // rewritten on their own.
+    TrustId tid = getTrustIdFor(cur);
+    Trace("int-blaster-proof") << "- atom, proven by ";
+    if (tid == TrustId::NONE)
+    {
+      Trace("int-blaster-proof") << "BV_INTBLAST_STEP";
+    }
+    else
+    {
+      Trace("int-blaster-proof") << "trusted step " << tid;
+    }
+    Trace("int-blaster-proof") << ": " << cur << " = " << t << std::endl;
+    if (tid == TrustId::NONE)
+    {
+      tpg.addRewriteStep(
+          cur, t, ProofRule::BV_INTBLAST_STEP, {}, {cur.eqNode(t)}, true);
+    }
+    else
+    {
+      tpg.addRewriteStep(cur, t, nullptr, true, tid);
+    }
+  }
+}
+
+TrustId IntBlaster::getTrustIdFor(Node atom)
+{
+  if ((d_mode != options::SolveBVAsIntMode::SUM || d_granularity != 1)
+      && expr::hasSubtermKinds(
+          {Kind::BITVECTOR_AND, Kind::BITVECTOR_OR, Kind::BITVECTOR_XOR}, atom))
+  {
+    return TrustId::INT_BLASTER_BITWISE_NOT_SUM_MODE_GRANULARITY_ONE;
+  }
+  if (!options().smt.bvToIntUsePow2
+      && expr::hasSubtermKinds(
+          {Kind::BITVECTOR_SHL, Kind::BITVECTOR_LSHR, Kind::BITVECTOR_ASHR},
+          atom))
+  {
+    return TrustId::INT_BLASTER_SHIFT_WITHOUT_USE_POW2;
+  }
+  return TrustId::NONE;
+}
 
 void IntBlaster::addRangeConstraint(Node node,
                                     uint32_t size,
@@ -333,88 +418,7 @@ TrustNode IntBlaster::trustedIntBlast(Node n,
   {
     return TrustNode::null();
   }
-  if (d_tpg != nullptr)
-  {
-    addTranslationSteps(n);
-  }
-  return TrustNode::mkTrustRewrite(n, res, d_tpg.get());
-}
-
-void IntBlaster::addTranslationSteps(Node n)
-{
-  Trace("int-blaster-proof") << "add proof steps for: " << n << std::endl;
-  std::unordered_set<Node> visited;
-  std::vector<Node> toVisit{n};
-  while (!toVisit.empty())
-  {
-    Node cur = toVisit.back();
-    toVisit.pop_back();
-    if (!visited.insert(cur).second)
-    {
-      continue;
-    }
-    Assert(cur.getType().isBoolean());
-    if (expr::isBooleanConnective(cur))
-    {
-      // Boolean connectives are translated to themselves applied to the
-      // translation of their children, which is proven by congruence.
-      Trace("int-blaster-proof")
-          << "- connective, proven by congruence: " << cur << std::endl;
-      toVisit.insert(toVisit.end(), cur.begin(), cur.end());
-      continue;
-    }
-    CDNodeMap::const_iterator it = d_intblastCache.find(cur);
-    Assert(it != d_intblastCache.end());
-    Node t = (*it).second;
-    if (t == cur)
-    {
-      Trace("int-blaster-proof")
-          << "- unchanged, no step needed: " << cur << std::endl;
-      continue;
-    }
-    // cur is an atom, whose translation is proven by one step, including the
-    // conditions of its bit-vector terms and the body of a quantified formula.
-    // The step is applied at pre-rewrite, so that the subterms of cur are not
-    // rewritten on their own.
-    TrustId tid = getTrustIdFor(cur);
-    Trace("int-blaster-proof") << "- atom, proven by ";
-    if (tid == TrustId::NONE)
-    {
-      Trace("int-blaster-proof") << "BV_INTBLAST_STEP";
-    }
-    else
-    {
-      Trace("int-blaster-proof") << "trusted step " << tid;
-    }
-    Trace("int-blaster-proof") << ": " << cur << " = " << t << std::endl;
-    if (tid == TrustId::NONE)
-    {
-      d_tpg->addRewriteStep(
-          cur, t, ProofRule::BV_INTBLAST_STEP, {}, {cur.eqNode(t)}, true);
-    }
-    else
-    {
-      d_tpg->addRewriteStep(cur, t, nullptr, true, tid);
-    }
-  }
-}
-
-TrustId IntBlaster::getTrustIdFor(Node atom)
-{
-  if ((d_mode != options::SolveBVAsIntMode::SUM || d_granularity != 1)
-      && expr::hasSubtermKinds(
-          {Kind::BITVECTOR_AND, Kind::BITVECTOR_OR, Kind::BITVECTOR_XOR}, atom))
-  {
-    return TrustId::INT_BLASTER_BITWISE_NOT_SUM_MODE_GRANULARITY_ONE;
-  }
-  if (!options().smt.bvToIntUsePow2
-      && expr::hasSubtermKinds(
-          {Kind::BITVECTOR_SHL, Kind::BITVECTOR_LSHR, Kind::BITVECTOR_ASHR},
-          atom))
-  {
-    return TrustId::INT_BLASTER_SHIFT_WITHOUT_USE_POW2;
-  }
-  return TrustId::NONE;
+  return TrustNode::mkTrustRewrite(n, res, this);
 }
 
 Node IntBlaster::intBlast(Node n,
