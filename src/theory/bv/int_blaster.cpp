@@ -193,6 +193,7 @@ TrustId IntBlaster::getTrustIdFor(Node atom)
 
 void IntBlaster::addRangeConstraint(Node node,
                                     uint32_t size,
+                                    FactKind kind,
                                     std::vector<TrustNode>& lemmas)
 {
   Node rangeConstraint = mkRangeConstraint(node, size);
@@ -203,26 +204,7 @@ void IntBlaster::addRangeConstraint(Node node,
     Trace("int-blaster-debug")
         << "node added to cache and constraints added to lemmas " << std::endl;
     d_rangeNodes.insert(node);
-    SkolemId id;
-    Node cacheVal;
-    if (!SkolemManager::isSkolemFunction(node, id, cacheVal)
-        || id != SkolemId::PURIFY)
-    {
-      // an application of an int-blasted function
-      d_factKind.insert(rangeConstraint, FactKind::FUNCTION_RANGE);
-    }
-    else if (cacheVal.getKind() == Kind::BITVECTOR_UBV_TO_INT)
-    {
-      // the purification of a bit-vector variable, whose range follows from
-      // the range of ubv_to_int
-      d_factKind.insert(rangeConstraint, FactKind::VARIABLE_RANGE);
-    }
-    else
-    {
-      // the range of the purification of an integer-and, which is introduced
-      // in the bitwise mode, is not justified by a proof rule
-      d_factKind.insert(rangeConstraint, FactKind::BITWISE_CONSTRAINT);
-    }
+    d_factKind.insert(rangeConstraint, kind);
     TrustNode trn = TrustNode::mkTrustLemma(rangeConstraint, this);
     lemmas.push_back(trn);
   }
@@ -818,8 +800,10 @@ Node IntBlaster::translateWithChildren(
       // appropriate quantifier.
       if (original.getType().isBitVector() && !expr::hasBoundVar(original))
       {
-        addRangeConstraint(
-            returnNode, original.getType().getBitVectorSize(), lemmas);
+        addRangeConstraint(returnNode,
+                           original.getType().getBitVectorSize(),
+                           FactKind::FUNCTION_RANGE,
+                           lemmas);
       }
       break;
     }
@@ -975,7 +959,8 @@ Node IntBlaster::translateNoChildren(Node original,
         // connection between original and the new variable via intCast
         translation = d_nm->getSkolemManager()->mkPurifySkolem(intCast);
         uint32_t bvsize = original.getType().getBitVectorSize();
-        addRangeConstraint(translation, bvsize, lemmas);
+        addRangeConstraint(
+            translation, bvsize, FactKind::VARIABLE_RANGE, lemmas);
         // put new definition of old variable in skolems
         bvCast = castToType(translation, original.getType());
 
@@ -1332,7 +1317,8 @@ Node IntBlaster::createBVAndNode(Node x,
     Node iAnd = d_nm->mkNode(Kind::IAND, iAndOp, x, y);
     // get a skolem so the IAND solver knows not to do work
     returnNode = d_nm->getSkolemManager()->mkPurifySkolem(iAnd);
-    addRangeConstraint(returnNode, bvsize, lemmas);
+    addRangeConstraint(
+        returnNode, bvsize, FactKind::BITWISE_CONSTRAINT, lemmas);
 
     // eagerly add bitwise lemmas according to the provided granularity
     uint32_t high_bit;

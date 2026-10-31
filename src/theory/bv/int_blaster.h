@@ -191,9 +191,10 @@ class IntBlaster : protected EnvObj, public ProofGenerator
                        uint32_t bvsize,
                        bool isLeftShift);
 
-  /** Adds the constraint 0 <= node < 2^size to lemmas */
+  /** Adds the constraint 0 <= node < 2^size of the given kind to lemmas */
   void addRangeConstraint(Node node,
                           uint32_t size,
+                          FactKind kind,
                           std::vector<TrustNode>& lemmas);
 
   /** Adds the constraint forall x1,...,xn. 0 <= f(x1,...,xn) < 2^size to lemmas
