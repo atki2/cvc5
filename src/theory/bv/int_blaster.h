@@ -20,11 +20,14 @@
 #include "context/cdo.h"
 #include "options/smt_options.h"
 #include "proof/proof_generator.h"
+#include "proof/trust_id.h"
 #include "proof/trust_node.h"
 #include "smt/env_obj.h"
 #include "theory/arith/nl/iand_utils.h"
 
 namespace cvc5::internal {
+
+class TConvProofGenerator;
 
 /*
 ** Converts bit-vector formulas to integer formulas.
@@ -94,6 +97,22 @@ class IntBlaster : protected EnvObj, public ProofGenerator
 {
   using CDNodeMap = context::CDHashMap<Node, Node>;
 
+  /** The kinds of facts proven by getProofFor */
+  enum class FactKind
+  {
+    /** a rewrite computed by trustedIntBlast */
+    REWRITE,
+    /** the range constraint of a bit-vector variable */
+    VARIABLE_RANGE,
+    /** the range constraint of a function application */
+    FUNCTION_RANGE,
+    /** the quantified range constraint of a function */
+    QUANTIFIED_RANGE,
+    /** a range or bitwise constraint on an integer-and of the bitwise mode */
+    BITWISE_CONSTRAINT
+  };
+  using CDNodeFactKindMap = context::CDHashMap<Node, FactKind>;
+
  public:
   /**
    * Constructor.
@@ -137,8 +156,16 @@ class IntBlaster : protected EnvObj, public ProofGenerator
   /**
    * Get proof for fact, where fact may correspond to:
    * (1) An equality of the form (= n n') where n was rewritten to n' in the
-   * method trustedIntBlast.
-   * (2) A lemma added to lemmas in the method trustedIntBlast.
+   * method trustedIntBlast, proven by the steps of addTranslationSteps.
+   * (2) A range constraint added in addRangeConstraint, proven by
+   * ProofRule::UBV_RANGE for a bit-vector variable and by
+   * ProofRule::BV_INTBLAST_RANGE for a function application.
+   * (3) A quantified range constraint added in addQuantifiedRangeConstraint,
+   * proven by ProofRule::BV_INTBLAST_RANGE_QUANT.
+   * (4) A constraint on an integer-and of the bitwise mode, which is either a
+   * range constraint or a bitwise constraint added in addBitwiseConstraint.
+   * It is a trusted step with identifier
+   * TrustId::INT_BLASTER_BITWISE_NOT_SUM_MODE_GRANULARITY_ONE.
    */
   std::shared_ptr<ProofNode> getProofFor(Node fact) override;
   /** identify */
@@ -359,6 +386,26 @@ class IntBlaster : protected EnvObj, public ProofGenerator
                            std::vector<TrustNode>& lemmas,
                            std::map<Node, Node>& skolems);
 
+  /**
+   * Adds to tpg the rewrite steps justifying the translation of n computed
+   * by trustedIntBlast. The translation of the Boolean connectives of n is
+   * justified by congruence, and the translation of each atom below them,
+   * including the conditions of its bit-vector terms and the body of a
+   * quantified formula, by a step of ProofRule::BV_INTBLAST_STEP, or by a
+   * trusted step if getTrustIdFor returns a trust identifier for it.
+   */
+  void addTranslationSteps(Node n, TConvProofGenerator& tpg);
+
+  /**
+   * Returns the trust identifier for the translation of atom if it is not
+   * justified by ProofRule::BV_INTBLAST_STEP, and TrustId::NONE otherwise.
+   * This is the case for:
+   * (1) bitwise operators, unless we are using the sum mode with granularity
+   * one.
+   * (2) shift operators, unless we are using the pow2 operator.
+   */
+  TrustId getTrustIdFor(Node atom);
+
   /** Caches for the different functions */
   CDNodeMap d_binarizeCache;
   CDNodeMap d_intblastCache;
@@ -376,6 +423,12 @@ class IntBlaster : protected EnvObj, public ProofGenerator
    *   used in for options::SolveBVAsIntMode::BITWISE
    */
   context::CDHashSet<Node> d_bitwiseAssertions;
+
+  /**
+   * Maps the facts proved by this generator to their kind, so that getProofFor
+   * can dispatch on it.
+   */
+  CDNodeFactKindMap d_factKind;
 
   /** Useful constants */
   Node d_zero;

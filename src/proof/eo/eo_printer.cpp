@@ -186,6 +186,10 @@ bool EoPrinter::isHandled(const Options& opts, const ProofNode* pfn)
     case ProofRule::ARITH_POLY_NORM_REL:
     case ProofRule::BV_POLY_NORM:
     case ProofRule::BV_POLY_NORM_EQ:
+    case ProofRule::BV_INTBLAST_STEP:
+    case ProofRule::BV_INTBLAST_RANGE:
+    case ProofRule::BV_INTBLAST_RANGE_QUANT:
+    case ProofRule::UBV_RANGE:
     case ProofRule::EXISTS_STRING_LENGTH:
     case ProofRule::ANNOTATE:
     case ProofRule::DSL_REWRITE: return true;

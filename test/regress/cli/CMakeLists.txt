@@ -379,13 +379,25 @@ set(regress_0_tests
   regress0/bv/bv_to_int_9071.smt2
   regress0/bv/bv_to_int_9071_bv4.smt2
   regress0/bv/bv_to_int_9071_th_sym.smt2
+  regress0/bv/bv_to_int_bool_arg.smt2
+  regress0/bv/bv_to_int_bvite.smt2
   regress0/bv/bv_to_int_bvuf_to_intuf.smt2
   regress0/bv/bv_to_int_bvuf_to_intuf_sorts.smt2
+  regress0/bv/bv_to_int_div_by_zero.smt2
   regress0/bv/bv_to_int_elim_err.smt2
+  regress0/bv/bv_to_int_forall.smt2
+  regress0/bv/bv_to_int_forall_in_cond.smt2
   regress0/bv/bv_to_int_issue_8413_1.smt2
   regress0/bv/bv_to_int_issue_8413_2.smt2
   regress0/bv/bv_to_int_int1.smt2
+  regress0/bv/bv_to_int_nested_cond.smt2
   regress0/bv/bv_to_int_proj_417.smt2
+  regress0/bv/bv_to_int_quant_range.smt2
+  regress0/bv/bv_to_int_range_1bit.smt2
+  regress0/bv/bv_to_int_shifts_pow2.smt2
+  regress0/bv/bv_to_int_sign_extend.smt2
+  regress0/bv/bv_to_int_uf_range.smt2
+  regress0/bv/bv_to_int_xor_not.smt2
   regress0/bv/bv_to_int_zext.smt2
   regress0/bv/bv_to_bool_conflict.smt2
   regress0/bv/bvcomp.cvc.smt2

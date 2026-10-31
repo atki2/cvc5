@@ -1448,6 +1448,67 @@ enum ENUM(ProofRule)
   EVALUE(BV_POLY_NORM_EQ),
   /**
    * \verbatim embed:rst:leading-asterisk
+   * **Bit-vectors -- Int-blasting translation step**
+   *
+   * .. math::
+   *
+   *   \inferrule{-\mid F}{F}
+   *
+   * where :math:`F` is an equivalence between an atom over bit-vectors, which
+   * may be a quantified formula, and its integer translation, computed by the
+   * int-blasting preprocessing pass. The Boolean structure above the atom is
+   * translated by congruence instead.
+   * This rule is used for bitwise operators only with the options
+   * ``--solve-bv-as-int=sum`` and ``--bvand-integer-granularity=1``, and for
+   * shift operators only with the option ``--bv-to-int-use-pow2``.
+   * \endverbatim
+   */
+  EVALUE(BV_INTBLAST_STEP),
+  /**
+   * \verbatim embed:rst:leading-asterisk
+   * **Bit-vectors -- Int-blasting range constraint**
+   *
+   * .. math::
+   *
+   *   \inferrule{-\mid F}{F}
+   *
+   * where :math:`F` is the constraint :math:`0 \leq k < 2^n` on an integer
+   * term :math:`k` introduced by the int-blasting preprocessing pass, which is
+   * an application of the integer function introduced for a function whose
+   * return type is a bit-vector of width :math:`n`.
+   * \endverbatim
+   */
+  EVALUE(BV_INTBLAST_RANGE),
+  /**
+   * \verbatim embed:rst:leading-asterisk
+   * **Bit-vectors -- Int-blasting quantified range constraint**
+   *
+   * .. math::
+   *
+   *   \inferrule{-\mid F}{F}
+   *
+   * where :math:`F` is a universally quantified range constraint
+   * :math:`\forall x_1 \dots x_m.\; 0 \leq f(x_1,\dots,x_m) < 2^n` on the
+   * integer function :math:`f` that the int-blasting preprocessing pass
+   * introduced for an uninterpreted function whose range is a bit-vector sort
+   * of width :math:`n`.
+   * \endverbatim
+   */
+  EVALUE(BV_INTBLAST_RANGE_QUANT),
+  /**
+   * \verbatim embed:rst:leading-asterisk
+   * **Bit-vectors -- Range of the unsigned integer value**
+   *
+   * .. math::
+   *
+   *   \inferrule{-\mid t}{0 \leq \texttt{ubv_to_int}(t) < 2^n}
+   *
+   * where :math:`t` is a bit-vector term of width :math:`n`.
+   * \endverbatim
+   */
+  EVALUE(UBV_RANGE),
+  /**
+   * \verbatim embed:rst:leading-asterisk
    * **Datatypes -- Split**
    *
    * .. math::

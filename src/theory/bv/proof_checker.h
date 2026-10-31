@@ -32,6 +32,12 @@ class BVProofRuleChecker : public ProofRuleChecker
   /** Register all rules owned by this rule checker into pc. */
   void registerTo(ProofChecker* pc) override;
 
+  /**
+   * Returns the conclusion of ProofRule::UBV_RANGE for the bit-vector term t
+   * of width n, which is (and (<= 0 (ubv_to_int t)) (< (ubv_to_int t) 2^n)).
+   */
+  static Node mkUbvRange(NodeManager* nm, Node t);
+
  protected:
   /** Return the conclusion of the given proof step, or null if it is invalid */
   Node checkInternal(ProofRule id,

@@ -3,6 +3,7 @@
 (include "../programs/PolyNorm.eo")
 (include "../programs/Bitblasting.eo")
 (include "../programs/Nary.eo")
+(include "../programs/IntBlasting.eo")
 
 ;;;;; ProofRewriteRule::BV_REPEAT_ELIM
 ; rule: bv-repeat-elim
@@ -297,4 +298,68 @@
       ((eo::zmod (eo::to_z cx) 2) 1)
       ((eo::zmod (eo::to_z cy) 2) 1))
   :conclusion (= (= xb1 xb2) (= yb1 yb2))
+)
+
+;;;;; ProofRule::BV_INTBLAST_STEP
+
+; rule: bv_intblast_step
+; implements: ProofRule::BV_INTBLAST_STEP.
+; args:
+; - eq Bool: The equality to prove.
+; requires: >
+;   We require that $bv_mk_intblast_step applied to the left hand side returns
+;   the right hand side.
+; conclusion: The given equality.
+; note: >
+;   The left hand side is an atom, which may be a quantified formula, since the
+;   Boolean structure above atoms is int-blasted by congruence.
+;   This rule is used for bitwise operators only with the options
+;   --solve-bv-as-int=sum and --bvand-integer-granularity=1, and for shift
+;   operators only with the option --bv-to-int-use-pow2.
+;   The current implementation only covers some of the operators that may
+;   appear in ProofRule::BV_INTBLAST_STEP.
+(declare-rule bv_intblast_step ((a Bool) (b Bool))
+  :args ((= a b))
+  :requires ((($bv_mk_intblast_step a) b))
+  :conclusion (= a b)
+)
+
+;;;;; ProofRule::BV_INTBLAST_RANGE
+
+; rule: bv_intblast_range
+; implements: ProofRule::BV_INTBLAST_RANGE.
+; args:
+; - F Bool: The range constraint to prove, on an application of an int-blasted function.
+; requires: We require that $bv_intblast_range_bound applied to k returns b.
+; conclusion: The given range constraint.
+(declare-rule bv_intblast_range ((k Int) (b Int))
+  :args ((and (>= k 0) (not (>= k b))))
+  :requires ((($bv_intblast_range_bound k) b))
+  :conclusion (and (>= k 0) (not (>= k b)))
+)
+
+;;;;; ProofRule::BV_INTBLAST_RANGE_QUANT
+
+; rule: bv_intblast_range_quant
+; implements: ProofRule::BV_INTBLAST_RANGE_QUANT.
+; args:
+; - F Bool: The quantified range constraint to prove.
+; requires: We require that $bv_intblast_range_bound applied to k returns b.
+; conclusion: The given quantified range constraint.
+(declare-rule bv_intblast_range_quant ((xs @List) (k Int) (b Int))
+  :args ((forall xs (and (>= k 0) (not (>= k b)))))
+  :requires ((($bv_intblast_range_bound k) b))
+  :conclusion (forall xs (and (>= k 0) (not (>= k b))))
+)
+
+;;;;; ProofRule::UBV_RANGE
+
+; rule: ubv_range
+; implements: ProofRule::UBV_RANGE.
+; args:
+; - t (BitVec n): A bitvector term.
+; conclusion: The range of the unsigned integer value of t.
+(declare-rule ubv_range ((n Int) (t (BitVec n)))
+  :args (t)
+  :conclusion (and (<= 0 (ubv_to_int t)) (< (ubv_to_int t) ($arith_eval_int_pow_2 ($bv_bitwidth (eo::typeof t)))))
 )
