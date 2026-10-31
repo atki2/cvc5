@@ -99,8 +99,8 @@ class IntBlaster : protected EnvObj, public ProofGenerator
   /** The kinds of facts proven by getProofFor */
   enum class FactKind
   {
-    /** a rewrite computed by trustedIntBlast */
-    REWRITE,
+    /** the equality of a formula and its translation by trustedIntBlast */
+    BV_TO_INT_EQUALITY,
     /** the range constraint of a bit-vector variable */
     VARIABLE_RANGE,
     /** the range constraint of a function application */

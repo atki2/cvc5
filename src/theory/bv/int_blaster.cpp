@@ -76,7 +76,7 @@ std::shared_ptr<ProofNode> IntBlaster::getProofFor(Node fact)
   CDProof cdp(d_env);
   switch ((*it).second)
   {
-    case FactKind::REWRITE:
+    case FactKind::BV_TO_INT_EQUALITY:
     {
       // proven atom by atom
       TConvProofGenerator tpg(d_env,
@@ -151,16 +151,12 @@ void IntBlaster::addTranslationSteps(Node n, TConvProofGenerator& tpg)
           << "- unchanged, no step needed: " << cur << std::endl;
       continue;
     }
-    // cur is an atom, whose translation is proven by one step, including the
-    // conditions of its bit-vector terms and the body of a quantified formula.
     addAtomStep(cur, t, tpg);
   }
 }
 
 void IntBlaster::addAtomStep(Node atom, Node t, TConvProofGenerator& tpg)
 {
-  // The step is applied at pre-rewrite, so that the subterms of atom are not
-  // rewritten on their own.
   if ((d_mode != options::SolveBVAsIntMode::SUM || d_granularity != 1)
       && expr::hasSubtermKinds(
           {Kind::BITVECTOR_AND, Kind::BITVECTOR_OR, Kind::BITVECTOR_XOR}, atom))
@@ -404,7 +400,7 @@ TrustNode IntBlaster::trustedIntBlast(Node n,
   {
     return TrustNode::null();
   }
-  d_factKind.insert(n.eqNode(res), FactKind::REWRITE);
+  d_factKind.insert(n.eqNode(res), FactKind::BV_TO_INT_EQUALITY);
   return TrustNode::mkTrustRewrite(n, res, this);
 }
 
