@@ -148,7 +148,8 @@ Node BVProofRuleChecker::checkInternal(ProofRule id,
   {
     Assert(children.empty());
     Assert(args.size() == 1);
-    // placeholder rules for int-blasting proofs, accept any fact
+    // these rules are checked by their Eunoia definitions, here we accept any
+    // fact
     return args[0];
   }
   else if (id == ProofRule::UBV_RANGE)

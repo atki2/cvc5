@@ -55,7 +55,7 @@ IntBlaster::IntBlaster(Env& env,
       d_intblastCache(userContext()),
       d_rangeNodes(userContext()),
       d_bitwiseAssertions(userContext()),
-      d_factProofRule(userContext()),
+      d_factKind(userContext()),
       d_iandUtils(nodeManager()),
       d_mode(mode),
       d_context(userContext())
@@ -71,12 +71,14 @@ IntBlaster::~IntBlaster() {}
 
 std::shared_ptr<ProofNode> IntBlaster::getProofFor(Node fact)
 {
-  if (fact.getKind() == Kind::EQUAL)
+  CDNodeFactKindMap::const_iterator it = d_factKind.find(fact);
+  Assert(it != d_factKind.end());
+  CDProof cdp(d_env);
+  switch ((*it).second)
   {
-    CDNodeMap::const_iterator itt = d_intblastCache.find(fact[0]);
-    if (itt != d_intblastCache.end() && (*itt).second == fact[1])
+    case FactKind::REWRITE:
     {
-      // a rewrite computed by trustedIntBlast
+      // proven atom by atom
       TConvProofGenerator tpg(d_env,
                               nullptr,
                               TConvPolicy::ONCE,
@@ -85,29 +87,32 @@ std::shared_ptr<ProofNode> IntBlaster::getProofFor(Node fact)
       addTranslationSteps(fact[0], tpg);
       return tpg.getProofFor(fact);
     }
-  }
-  CDProof cdp(d_env);
-  CDNodeRuleMap::const_iterator it = d_factProofRule.find(fact);
-  if (it == d_factProofRule.end())
-  {
-    // a constraint on an integer-and of the bitwise mode, which is not
-    // justified by a proof rule
-    Assert(d_mode == options::SolveBVAsIntMode::BITWISE);
-    cdp.addTrustedStep(fact, TrustId::INT_BLASTER_BITWISE_NOT_SUM_MODE_GRANULARITY_ONE, {}, {});
-  }
-  else if ((*it).second == ProofRule::UBV_RANGE)
-  {
-    // the range constraint of the purification k of (ubv_to_int t) follows
-    // from the range of (ubv_to_int t), since k is equivalent to it
-    Assert(fact.getKind() == Kind::AND && fact[0].getKind() == Kind::GEQ);
-    Node t = SkolemManager::getUnpurifiedForm(fact[0][0])[0];
-    Node range = BVProofRuleChecker::mkUbvRange(nodeManager(), t);
-    cdp.addStep(range, ProofRule::UBV_RANGE, {}, {t});
-    cdp.addStep(fact, ProofRule::MACRO_SR_PRED_TRANSFORM, {range}, {fact});
-  }
-  else
-  {
-    cdp.addStep(fact, (*it).second, {}, {fact});
+    case FactKind::VARIABLE_RANGE:
+    {
+      // the range constraint of the purification k of (ubv_to_int t) follows
+      // from the range of (ubv_to_int t), since k is equivalent to it
+      Assert(fact.getKind() == Kind::AND && fact[0].getKind() == Kind::GEQ);
+      Node k = fact[0][0];
+      Node t = SkolemManager::getUnpurifiedForm(k)[0];
+      Node range = BVProofRuleChecker::mkUbvRange(d_nm, t);
+      cdp.addStep(range, ProofRule::UBV_RANGE, {}, {t});
+      cdp.addStep(fact, ProofRule::MACRO_SR_PRED_TRANSFORM, {range}, {fact});
+      break;
+    }
+    case FactKind::FUNCTION_RANGE:
+      cdp.addStep(fact, ProofRule::BV_INTBLAST_RANGE, {}, {fact});
+      break;
+    case FactKind::QUANTIFIED_RANGE:
+      cdp.addStep(fact, ProofRule::BV_INTBLAST_RANGE_QUANT, {}, {fact});
+      break;
+    case FactKind::BITWISE_CONSTRAINT:
+      // not justified by a proof rule
+      cdp.addTrustedStep(
+          fact,
+          TrustId::INT_BLASTER_BITWISE_NOT_SUM_MODE_GRANULARITY_ONE,
+          {},
+          {});
+      break;
   }
   return cdp.getProofFor(fact);
 }
@@ -151,23 +156,18 @@ void IntBlaster::addTranslationSteps(Node n, TConvProofGenerator& tpg)
     // The step is applied at pre-rewrite, so that the subterms of cur are not
     // rewritten on their own.
     TrustId tid = getTrustIdFor(cur);
-    Trace("int-blaster-proof") << "- atom, proven by ";
     if (tid == TrustId::NONE)
     {
-      Trace("int-blaster-proof") << "BV_INTBLAST_STEP";
-    }
-    else
-    {
-      Trace("int-blaster-proof") << "trusted step " << tid;
-    }
-    Trace("int-blaster-proof") << ": " << cur << " = " << t << std::endl;
-    if (tid == TrustId::NONE)
-    {
+      Trace("int-blaster-proof")
+          << "- atom, proven by BV_INTBLAST_STEP: " << cur << " = " << t
+          << std::endl;
       tpg.addRewriteStep(
           cur, t, ProofRule::BV_INTBLAST_STEP, {}, {cur.eqNode(t)}, true);
     }
     else
     {
+      Trace("int-blaster-proof") << "- atom, proven by trusted step " << tid
+                                 << ": " << cur << " = " << t << std::endl;
       tpg.addRewriteStep(cur, t, nullptr, true, tid);
     }
   }
@@ -209,16 +209,20 @@ void IntBlaster::addRangeConstraint(Node node,
         || id != SkolemId::PURIFY)
     {
       // an application of an int-blasted function
-      d_factProofRule.insert(rangeConstraint, ProofRule::BV_INTBLAST_RANGE);
+      d_factKind.insert(rangeConstraint, FactKind::FUNCTION_RANGE);
     }
     else if (cacheVal.getKind() == Kind::BITVECTOR_UBV_TO_INT)
     {
       // the purification of a bit-vector variable, whose range follows from
       // the range of ubv_to_int
-      d_factProofRule.insert(rangeConstraint, ProofRule::UBV_RANGE);
+      d_factKind.insert(rangeConstraint, FactKind::VARIABLE_RANGE);
     }
-    // otherwise, the range of the purification of an integer-and, which is
-    // introduced in the bitwise mode, is not justified by a proof rule
+    else
+    {
+      // the range of the purification of an integer-and, which is introduced
+      // in the bitwise mode, is not justified by a proof rule
+      d_factKind.insert(rangeConstraint, FactKind::BITWISE_CONSTRAINT);
+    }
     TrustNode trn = TrustNode::mkTrustLemma(rangeConstraint, this);
     lemmas.push_back(trn);
   }
@@ -250,7 +254,7 @@ void IntBlaster::addQuantifiedRangeConstraint(Node f,
                                   "range constraint added to cache and lemmas "
                                << std::endl;
     d_rangeNodes.insert(f);
-    d_factProofRule.insert(rangeConstraint, ProofRule::BV_INTBLAST_RANGE_QUANT);
+    d_factKind.insert(rangeConstraint, FactKind::QUANTIFIED_RANGE);
     TrustNode trn = TrustNode::mkTrustLemma(rangeConstraint, this);
     lemmas.push_back(trn);
   }
@@ -265,6 +269,7 @@ void IntBlaster::addBitwiseConstraint(Node bitwiseConstraint,
         << "bitwise constraint added to cache and lemmas: " << bitwiseConstraint
         << std::endl;
     d_bitwiseAssertions.insert(bitwiseConstraint);
+    d_factKind.insert(bitwiseConstraint, FactKind::BITWISE_CONSTRAINT);
     TrustNode trn = TrustNode::mkTrustLemma(bitwiseConstraint, this);
     lemmas.push_back(trn);
   }
@@ -418,6 +423,7 @@ TrustNode IntBlaster::trustedIntBlast(Node n,
   {
     return TrustNode::null();
   }
+  d_factKind.insert(n.eqNode(res), FactKind::REWRITE);
   return TrustNode::mkTrustRewrite(n, res, this);
 }
 

@@ -18,7 +18,6 @@
 #include "context/cdhashmap.h"
 #include "context/cdhashset.h"
 #include "context/cdo.h"
-#include "cvc5/cvc5_proof_rule.h"
 #include "options/smt_options.h"
 #include "proof/proof_generator.h"
 #include "proof/trust_id.h"
@@ -97,7 +96,22 @@ class TConvProofGenerator;
 class IntBlaster : protected EnvObj, public ProofGenerator
 {
   using CDNodeMap = context::CDHashMap<Node, Node>;
-  using CDNodeRuleMap = context::CDHashMap<Node, ProofRule>;
+
+  /** The kinds of facts proven by getProofFor */
+  enum class FactKind
+  {
+    /** a rewrite computed by trustedIntBlast */
+    REWRITE,
+    /** the range constraint of a bit-vector variable */
+    VARIABLE_RANGE,
+    /** the range constraint of a function application */
+    FUNCTION_RANGE,
+    /** the quantified range constraint of a function */
+    QUANTIFIED_RANGE,
+    /** a range or bitwise constraint on an integer-and of the bitwise mode */
+    BITWISE_CONSTRAINT
+  };
+  using CDNodeFactKindMap = context::CDHashMap<Node, FactKind>;
 
  public:
   /**
@@ -411,10 +425,10 @@ class IntBlaster : protected EnvObj, public ProofGenerator
   context::CDHashSet<Node> d_bitwiseAssertions;
 
   /**
-   * Maps lemmas proved by this generator to the proof rule that proves them,
-   * so that getProofFor can dispatch to the appropriate rule.
+   * Maps the facts proved by this generator to their kind, so that getProofFor
+   * can dispatch on it.
    */
-  CDNodeRuleMap d_factProofRule;
+  CDNodeFactKindMap d_factKind;
 
   /** Useful constants */
   Node d_zero;
