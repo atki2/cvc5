@@ -20,7 +20,6 @@
 #include "context/cdo.h"
 #include "options/smt_options.h"
 #include "proof/proof_generator.h"
-#include "proof/trust_id.h"
 #include "proof/trust_node.h"
 #include "smt/env_obj.h"
 #include "theory/arith/nl/iand_utils.h"
@@ -392,20 +391,18 @@ class IntBlaster : protected EnvObj, public ProofGenerator
    * by trustedIntBlast. The translation of the Boolean connectives of n is
    * justified by congruence, and the translation of each atom below them,
    * including the conditions of its bit-vector terms and the body of a
-   * quantified formula, by a step of ProofRule::BV_INTBLAST_STEP, or by a
-   * trusted step if getTrustIdFor returns a trust identifier for it.
+   * quantified formula, by the step added in addAtomStep.
    */
   void addTranslationSteps(Node n, TConvProofGenerator& tpg);
 
   /**
-   * Returns the trust identifier for the translation of atom if it is not
-   * justified by ProofRule::BV_INTBLAST_STEP, and TrustId::NONE otherwise.
-   * This is the case for:
+   * Adds to tpg the rewrite step justifying the translation of atom to t,
+   * which is a step of ProofRule::BV_INTBLAST_STEP, or a trusted step for:
    * (1) bitwise operators, unless we are using the sum mode with granularity
    * one.
    * (2) shift operators, unless we are using the pow2 operator.
    */
-  TrustId getTrustIdFor(Node atom);
+  void addAtomStep(Node atom, Node t, TConvProofGenerator& tpg);
 
   /** Caches for the different functions */
   CDNodeMap d_binarizeCache;

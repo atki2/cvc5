@@ -153,42 +153,41 @@ void IntBlaster::addTranslationSteps(Node n, TConvProofGenerator& tpg)
     }
     // cur is an atom, whose translation is proven by one step, including the
     // conditions of its bit-vector terms and the body of a quantified formula.
-    // The step is applied at pre-rewrite, so that the subterms of cur are not
-    // rewritten on their own.
-    TrustId tid = getTrustIdFor(cur);
-    if (tid == TrustId::NONE)
-    {
-      Trace("int-blaster-proof")
-          << "- atom, proven by BV_INTBLAST_STEP: " << cur << " = " << t
-          << std::endl;
-      tpg.addRewriteStep(
-          cur, t, ProofRule::BV_INTBLAST_STEP, {}, {cur.eqNode(t)}, true);
-    }
-    else
-    {
-      Trace("int-blaster-proof") << "- atom, proven by trusted step " << tid
-                                 << ": " << cur << " = " << t << std::endl;
-      tpg.addRewriteStep(cur, t, nullptr, true, tid);
-    }
+    addAtomStep(cur, t, tpg);
   }
 }
 
-TrustId IntBlaster::getTrustIdFor(Node atom)
+void IntBlaster::addAtomStep(Node atom, Node t, TConvProofGenerator& tpg)
 {
+  // The step is applied at pre-rewrite, so that the subterms of atom are not
+  // rewritten on their own.
   if ((d_mode != options::SolveBVAsIntMode::SUM || d_granularity != 1)
       && expr::hasSubtermKinds(
           {Kind::BITVECTOR_AND, Kind::BITVECTOR_OR, Kind::BITVECTOR_XOR}, atom))
   {
-    return TrustId::INT_BLASTER_BITWISE_NOT_SUM_MODE_GRANULARITY_ONE;
+    TrustId tid = TrustId::INT_BLASTER_BITWISE_NOT_SUM_MODE_GRANULARITY_ONE;
+    Trace("int-blaster-proof") << "- atom, proven by trusted step " << tid
+                               << ": " << atom << " = " << t << std::endl;
+    tpg.addRewriteStep(atom, t, nullptr, true, tid);
   }
-  if (!options().smt.bvToIntUsePow2
-      && expr::hasSubtermKinds(
-          {Kind::BITVECTOR_SHL, Kind::BITVECTOR_LSHR, Kind::BITVECTOR_ASHR},
-          atom))
+  else if (!options().smt.bvToIntUsePow2
+           && expr::hasSubtermKinds({Kind::BITVECTOR_SHL,
+                                     Kind::BITVECTOR_LSHR,
+                                     Kind::BITVECTOR_ASHR},
+                                    atom))
   {
-    return TrustId::INT_BLASTER_SHIFT_WITHOUT_USE_POW2;
+    TrustId tid = TrustId::INT_BLASTER_SHIFT_WITHOUT_USE_POW2;
+    Trace("int-blaster-proof") << "- atom, proven by trusted step " << tid
+                               << ": " << atom << " = " << t << std::endl;
+    tpg.addRewriteStep(atom, t, nullptr, true, tid);
   }
-  return TrustId::NONE;
+  else
+  {
+    Trace("int-blaster-proof") << "- atom, proven by BV_INTBLAST_STEP: " << atom
+                               << " = " << t << std::endl;
+    tpg.addRewriteStep(
+        atom, t, ProofRule::BV_INTBLAST_STEP, {}, {atom.eqNode(t)}, true);
+  }
 }
 
 void IntBlaster::addRangeConstraint(Node node,
