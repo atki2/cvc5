@@ -233,6 +233,16 @@ enum class TrustId : uint32_t
    * or bvashr), which is the case unless we are using --bv-to-int-use-pow2.
    */
   INT_BLASTER_SHIFT_WITHOUT_USE_POW2,
+  /**
+   * A step in the external Alethe calculus, used as an intermediate step by
+   * the Alethe proof post-processor. The arguments of the trust step are
+   * :math:`(Q, id, Q', A_1, \dots, A_m)`, where :math:`Q` is the conclusion,
+   * :math:`id` is the identifier of a proof rule in the Alethe calculus
+   * (see proof::AletheRule), :math:`Q'` is the representation of :math:`Q` to
+   * be printed by the Alethe printer, and :math:`A_1, \dots, A_m` are the
+   * arguments of the Alethe rule.
+   */
+  ALETHE_RULE,
   /** Untracked sources of trust, which are discouraged */
   /** A rewrite of the input formula by a preprocessing pass without a proof */
   UNKNOWN_PREPROCESS,

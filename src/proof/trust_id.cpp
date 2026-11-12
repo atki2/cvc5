@@ -117,6 +117,7 @@ const char* toString(TrustId id)
       return "INT_BLASTER_BITWISE_NOT_SUM_MODE_GRANULARITY_ONE";
     case TrustId::INT_BLASTER_SHIFT_WITHOUT_USE_POW2:
       return "INT_BLASTER_SHIFT_WITHOUT_USE_POW2";
+    case TrustId::ALETHE_RULE: return "ALETHE_RULE";
     // unknown sources
     case TrustId::UNKNOWN_PREPROCESS: return "UNKNOWN_PREPROCESS";
     case TrustId::UNKNOWN_PREPROCESS_LEMMA: return "UNKNOWN_PREPROCESS_LEMMA";
