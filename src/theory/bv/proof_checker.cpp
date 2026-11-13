@@ -12,6 +12,7 @@
 
 #include "theory/bv/proof_checker.h"
 
+#include "expr/skolem_manager.h"
 #include "theory/arith/arith_poly_norm.h"
 #include "theory/bv/theory_bv_utils.h"
 #include "util/bitvector.h"
@@ -132,15 +133,59 @@ Node BVProofRuleChecker::checkInternal(ProofRule id,
     }
     return ret;
   }
-  else if (id == ProofRule::BV_INTBLAST_STEP
-           || id == ProofRule::BV_INTBLAST_RANGE
+  else if (id == ProofRule::BV_INTBLAST_STEP)
+  {
+    Assert(children.empty());
+    Assert(args.size() == 1);
+    // the translation is checked by the Eunoia rule
+    if (args[0].getKind() != Kind::EQUAL || !args[0][0].getType().isBoolean())
+    {
+      return Node::null();
+    }
+    return args[0];
+  }
+  else if (id == ProofRule::BV_INTBLAST_RANGE
            || id == ProofRule::BV_INTBLAST_RANGE_QUANT)
   {
     Assert(children.empty());
     Assert(args.size() == 1);
-    // these rules are checked by their Eunoia definitions, here we accept any
-    // fact
-    return args[0];
+    Node range = args[0];
+    if (id == ProofRule::BV_INTBLAST_RANGE_QUANT)
+    {
+      if (range.getKind() != Kind::FORALL)
+      {
+        return Node::null();
+      }
+      range = range[1];
+    }
+    // range is (and (>= k 0) (not (>= k 2^n))), k is an application of
+    // (@bv_to_int_uf f) and n is the width of the return type of f
+    if (range.getKind() != Kind::AND || range[0].getKind() != Kind::GEQ)
+    {
+      return Node::null();
+    }
+    Node k = range[0][0];
+    SkolemId sid;
+    Node f;
+    if (k.getKind() != Kind::APPLY_UF
+        || !SkolemManager::isSkolemFunction(k.getOperator(), sid, f)
+        || sid != SkolemId::BV_TO_INT_UF)
+    {
+      return Node::null();
+    }
+    TypeNode tn = f.getType().getRangeType();
+    if (!tn.isBitVector())
+    {
+      return Node::null();
+    }
+    NodeManager* nm = nodeManager();
+    Node zero = nm->mkConstInt(Rational(0));
+    Node ub = nm->mkConstInt(Rational(Integer(2).pow(tn.getBitVectorSize())));
+    Node expected =
+        nm->mkNode(Kind::AND,
+                   nm->mkNode(Kind::GEQ, k, zero),
+                   nm->mkNode(Kind::NOT, nm->mkNode(Kind::GEQ, k, ub)));
+    return range == expected ? args[0] : Node::null();
   }
   // no rule
   return Node::null();
