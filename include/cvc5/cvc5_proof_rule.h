@@ -1510,18 +1510,6 @@ enum ENUM(ProofRule)
   EVALUE(BV_INTBLAST_RANGE_QUANT),
   /**
    * \verbatim embed:rst:leading-asterisk
-   * **Bit-vectors -- Range of the unsigned integer value**
-   *
-   * .. math::
-   *
-   *   \inferrule{-\mid t}{0 \leq \texttt{ubv_to_int}(t) < 2^n}
-   *
-   * where :math:`t` is a bit-vector term of width :math:`n`.
-   * \endverbatim
-   */
-  EVALUE(UBV_RANGE),
-  /**
-   * \verbatim embed:rst:leading-asterisk
    * **Datatypes -- Split**
    *
    * .. math::

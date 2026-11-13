@@ -26,7 +26,7 @@
 #include "proof/conv_proof_generator.h"
 #include "proof/proof.h"
 #include "smt/logic_exception.h"
-#include "theory/bv/proof_checker.h"
+#include "theory/arith/arith_utilities.h"
 #include "theory/bv/theory_bv_utils.h"
 #include "theory/logic_info.h"
 #include "theory/rewriter.h"
@@ -89,13 +89,13 @@ std::shared_ptr<ProofNode> IntBlaster::getProofFor(Node fact)
     }
     case FactKind::VARIABLE_RANGE:
     {
-      // the range constraint of the purification k of (ubv_to_int t) follows
-      // from the range of (ubv_to_int t), since k is equivalent to it
+      // the range constraint of the purification k of (ubv_to_int x) follows
+      // from the range of (ubv_to_int x), since k is equivalent to it
       Assert(fact.getKind() == Kind::AND && fact[0].getKind() == Kind::GEQ);
       Node k = fact[0][0];
-      Node t = SkolemManager::getUnpurifiedForm(k)[0];
-      Node range = BVProofRuleChecker::mkUbvRange(d_nm, t);
-      cdp.addStep(range, ProofRule::UBV_RANGE, {}, {t});
+      Node u = SkolemManager::getUnpurifiedForm(k);
+      Node range = arith::ubvToIntRange(u);
+      cdp.addStep(range, ProofRule::UBV_TO_INT_RANGE, {}, {u});
       cdp.addStep(fact, ProofRule::MACRO_SR_PRED_TRANSFORM, {range}, {fact});
       break;
     }

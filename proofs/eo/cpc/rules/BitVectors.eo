@@ -351,15 +351,3 @@
   :requires ((($bv_intblast_range_bound k) b))
   :conclusion (forall xs (and (>= k 0) (not (>= k b))))
 )
-
-;;;;; ProofRule::UBV_RANGE
-
-; rule: ubv_range
-; implements: ProofRule::UBV_RANGE.
-; args:
-; - t (BitVec n): A bitvector term.
-; conclusion: The range of the unsigned integer value of t.
-(declare-rule ubv_range ((n Int) (t (BitVec n)))
-  :args (t)
-  :conclusion (and (<= 0 (ubv_to_int t)) (< (ubv_to_int t) ($arith_eval_int_pow_2 ($bv_bitwidth (eo::typeof t)))))
-)

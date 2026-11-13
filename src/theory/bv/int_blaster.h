@@ -157,7 +157,7 @@ class IntBlaster : protected EnvObj, public ProofGenerator
    * (1) An equality of the form (= n n') where n was rewritten to n' in the
    * method trustedIntBlast, proven by the steps of addTranslationSteps.
    * (2) A range constraint added in addRangeConstraint, proven by
-   * ProofRule::UBV_RANGE for a bit-vector variable and by
+   * ProofRule::UBV_TO_INT_RANGE for a bit-vector variable and by
    * ProofRule::BV_INTBLAST_RANGE for a function application.
    * (3) A quantified range constraint added in addQuantifiedRangeConstraint,
    * proven by ProofRule::BV_INTBLAST_RANGE_QUANT.
