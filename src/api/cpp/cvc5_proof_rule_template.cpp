@@ -122,6 +122,9 @@ const char* toString(ProofRule rule)
     case ProofRule::BV_EAGER_ATOM: return "BV_EAGER_ATOM";
     case ProofRule::BV_POLY_NORM: return "BV_POLY_NORM";
     case ProofRule::BV_POLY_NORM_EQ: return "BV_POLY_NORM_EQ";
+    case ProofRule::BV_INTBLAST_STEP: return "BV_INTBLAST_STEP";
+    case ProofRule::BV_INTBLAST_RANGE: return "BV_INTBLAST_RANGE";
+    case ProofRule::BV_INTBLAST_RANGE_QUANT: return "BV_INTBLAST_RANGE_QUANT";
     //================================================= Datatype rules
     case ProofRule::DT_SPLIT: return "DT_SPLIT";
     //================================================= Quantifiers rules
