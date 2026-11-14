@@ -1485,10 +1485,10 @@ enum ENUM(ProofRule)
    *
    *   \inferrule{-\mid F}{F}
    *
-   * where :math:`F` is the constraint :math:`0 \leq k < 2^n` on an integer
-   * term :math:`k` introduced by the int-blasting preprocessing pass, which is
-   * an application of the integer function introduced for a function whose
-   * return type is a bit-vector of width :math:`n`.
+   * where :math:`F` is :math:`0 \leq k < 2^n`, :math:`k` is an application
+   * of the integer function that the int-blasting preprocessing pass
+   * introduces for a function :math:`f`, and :math:`n` is the width of the
+   * return type of :math:`f`.
    * \endverbatim
    */
   EVALUE(BV_INTBLAST_RANGE),
@@ -1500,11 +1500,9 @@ enum ENUM(ProofRule)
    *
    *   \inferrule{-\mid F}{F}
    *
-   * where :math:`F` is a universally quantified range constraint
-   * :math:`\forall x_1 \dots x_m.\; 0 \leq f(x_1,\dots,x_m) < 2^n` on the
-   * integer function :math:`f` that the int-blasting preprocessing pass
-   * introduced for an uninterpreted function whose range is a bit-vector sort
-   * of width :math:`n`.
+   * where :math:`F` is :math:`\forall x_1 \dots x_m.\; 0 \leq k < 2^n`, and
+   * :math:`k`, :math:`f` and :math:`n` are as in
+   * :cpp:enumerator:`BV_INTBLAST_RANGE <cvc5::ProofRule::BV_INTBLAST_RANGE>`.
    * \endverbatim
    */
   EVALUE(BV_INTBLAST_RANGE_QUANT),
